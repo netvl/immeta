@@ -54,9 +54,10 @@ fn test_gif_plain() {
     let md = md.downcast::<gif::Metadata>().ok().expect("not GIF metadata");
     assert_eq!(md.version, gif::Version::V89a);
     assert_eq!(md.dimensions, OWLET_DIM);
-    assert_eq!(md.global_color_table, true);
-    assert_eq!(md.global_color_table_sorted, false);
-    assert_eq!(md.global_color_table_size, 256);
+    assert_eq!(md.global_color_table, Some(gif::ColorTable {
+        size: 256,
+        sorted: false
+    }));
     assert_eq!(md.color_resolution, 8);
     assert_eq!(md.background_color_index, 0);
     assert_eq!(md.pixel_aspect_ratio, 0);
@@ -66,8 +67,7 @@ fn test_gif_plain() {
         gif::Block::GraphicControlExtension(gif::GraphicControlExtension {
             disposal_method: gif::DisposalMethod::None,
             user_input: false,
-            transparent_color: false,
-            transparent_color_index: 0,
+            transparent_color_index: None,
             delay_time: 0
         }),
         gif::Block::ApplicationExtension(gif::ApplicationExtension {
@@ -77,9 +77,7 @@ fn test_gif_plain() {
         gif::Block::ImageDescriptor(gif::ImageDescriptor {
             left: 0, top: 0,
             width: 1280, height: 857,
-            local_color_table: false,
-            local_color_table_sorted: false,
-            local_color_table_size: 0,
+            local_color_table: None,
             interlace: false
         })
     ])
@@ -96,9 +94,10 @@ fn test_gif_animated() {
     let md = md.downcast::<gif::Metadata>().ok().expect("not GIF metadata");
     assert_eq!(md.version, gif::Version::V89a);
     assert_eq!(md.dimensions, DROP_DIM);
-    assert_eq!(md.global_color_table, true);
-    assert_eq!(md.global_color_table_sorted, false);
-    assert_eq!(md.global_color_table_size, 256);
+    assert_eq!(md.global_color_table, Some(gif::ColorTable {
+        size: 256,
+        sorted: false
+    }));
     assert_eq!(md.color_resolution, 7);
     assert_eq!(md.background_color_index, 255);
     assert_eq!(md.pixel_aspect_ratio, 0);
@@ -132,8 +131,7 @@ fn test_gif_animated() {
                             gif::DisposalMethod::DoNotDispose
                         },
                         user_input: false,
-                        transparent_color: true,
-                        transparent_color_index: 255,
+                        transparent_color_index: Some(255),
                         delay_time: 7
                     }
                 );
@@ -148,9 +146,7 @@ fn test_gif_animated() {
             &gif::Block::ImageDescriptor(gif::ImageDescriptor {
                 left: 0, top: 0,
                 width: 238, height: 212,
-                local_color_table: false,
-                local_color_table_sorted: false,
-                local_color_table_size: 0,
+                local_color_table: None,
                 interlace: false
             })
         );

@@ -46,15 +46,19 @@ fn skip_blocks<R: ?Sized + BufRead, F>(r: &mut R, on_eof: F) -> Result<()>
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ColorTable {
+    pub size: u16,
+    pub sorted: bool,
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ImageDescriptor {
     pub left: u16,
     pub top: u16,
     pub width: u16,
     pub height: u16,
 
-    pub local_color_table: bool,
-    pub local_color_table_sorted: bool,
-    pub local_color_table_size: u16,
+    pub local_color_table: Option<ColorTable>,
 
     pub interlace: bool
 }
@@ -106,9 +110,12 @@ impl ImageDescriptor {
             width: width,
             height: height,
 
-            local_color_table: local_color_table,
-            local_color_table_sorted: local_color_table_sorted,
-            local_color_table_size: local_color_table_size,
+            local_color_table: if local_color_table {
+                Some(ColorTable {
+                    size: local_color_table_size,
+                    sorted: local_color_table_sorted
+                })
+            } else { None },
 
             interlace: interlace
         })
@@ -120,8 +127,7 @@ pub struct GraphicControlExtension {
     pub disposal_method: DisposalMethod,
     pub user_input: bool,
 
-    pub transparent_color: bool,
-    pub transparent_color_index: u8,
+    pub transparent_color_index: Option<u8>,
 
     pub delay_time: u16  // 1/100th of second
 }
@@ -164,8 +170,11 @@ impl GraphicControlExtension {
                                            NAME, index, disposal_method))
             ),
             user_input: user_input,
-            transparent_color: transparent_color,
-            transparent_color_index: transparent_color_index,
+            transparent_color_index: if transparent_color { 
+                Some(transparent_color_index) 
+            } else { 
+                None
+            },
             delay_time: delay_time
         })
     }
@@ -318,12 +327,9 @@ pub struct Metadata {
 
     pub dimensions: Dimensions,
 
-    pub global_color_table: bool,
-    pub global_color_table_sorted: bool,
-    pub global_color_table_size: u16,
+    pub global_color_table: Option<ColorTable>,
 
     pub color_resolution: u8,
-
     pub background_color_index: u8,
     pub pixel_aspect_ratio: u8,
 
@@ -424,9 +430,14 @@ impl LoadableMetadata for Metadata {
 
             dimensions: (width, height).into(),
 
-            global_color_table: global_color_table,
-            global_color_table_sorted: global_color_table_sorted,
-            global_color_table_size: global_color_table_size,
+            global_color_table: if global_color_table {
+                Some(ColorTable {
+                    size: global_color_table_size,
+                    sorted: global_color_table_sorted
+                })
+            } else {
+                None
+            },
 
             color_resolution: color_resolution + 1,
 
