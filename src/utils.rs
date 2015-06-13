@@ -34,7 +34,7 @@ pub fn drop_until<R: BufRead + ?Sized>(r: &mut R, delim: u8) -> io::Result<usize
                 Err(ref e) if e.kind() == ErrorKind::Interrupted => continue,
                 Err(e) => return Err(e)
             };
-            match available.iter().cloned().position(|b| b == delim) {
+            match available.iter().position(|&b| b == delim) {
                 Some(i) => (true, i + 1),
                 None => (false, available.len()),
             }

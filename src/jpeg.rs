@@ -3,7 +3,7 @@ use std::io::{BufReader, Read};
 use byteorder::{ReadBytesExt, BigEndian};
 
 use types::{Result, Error, Dimensions};
-use traits::BaseMetadata;
+use traits::{Metadata, LoadableMetadata};
 use utils;
 
 pub struct JpegMetadata {
@@ -11,15 +11,20 @@ pub struct JpegMetadata {
     // TODO: something else?
 }
 
-impl BaseMetadata for JpegMetadata {
+impl Metadata for JpegMetadata {
     #[inline]
     fn dimensions(&self) -> Dimensions {
         self.dimensions
     }
 
     #[inline]
-    fn supports_load() -> bool { true }
+    fn bit_depth(&self) -> Option<u32> { None }
 
+    #[inline]
+    fn mime_type(&self) -> &'static str { "image/jpeg" }
+}
+
+impl LoadableMetadata for JpegMetadata {
     fn load<R: ?Sized + Read>(r: &mut R) -> Result<JpegMetadata> {
         let mut r = &mut BufReader::new(r);
         loop {
