@@ -5,10 +5,22 @@ use std::borrow::Cow;
 
 use num::ToPrimitive;
 
+/// Library-specific error type which is returned by metadata loading operations.
 #[derive(Debug)]
 pub enum Error {
+    /// Returned when metadata can't be recovered because image format is invalid.
+    ///
+    /// This error can be caused by broken file or when trying to load an image with
+    /// an incorrect metadata decoder, e.g. trying to load PNG metadata from JPEG.
     InvalidFormat(Cow<'static, str>),
+
+    /// Returned when metadata can't be recovered because of the sudden end of the image file.
+    ///
+    /// Usually this error is caused by broken files, but it may also be cause by applying
+    /// loose formats (like JPEG) to a different image type.
     UnexpectedEndOfFile(Option<Cow<'static, str>>),
+
+    /// Returned when an I/O error occurs when reading an input stream.
     Io(io::Error)
 }
 
@@ -40,11 +52,21 @@ impl From<::byteorder::Error> for Error {
     }
 }
 
+/// Library-specific result type.
 pub type Result<T> = result::Result<T, Error>;
 
+/// Represents image dimensions in pixels.
+///
+/// As it turns out, this is essentially the only common piece of information across
+/// various image formats.
+///
+/// It is possible to convert pairs of type `(T1, T2)`, where `T1` and `T2` are primitive
+/// number types, to this type, however, this is mostly needed for internal usage.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct Dimensions {
+    /// Image width in pixels.
     pub width: u32,
+    /// Image height in pixels.
     pub height: u32
 }
 
