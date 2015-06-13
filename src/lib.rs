@@ -6,8 +6,8 @@ mod types;
 mod utils;
 mod generic;
 
-pub mod jpeg;
+pub mod formats;
 
-pub use traits::*;
 pub use types::{Dimensions, Error, Result};
+pub use traits::*;
 pub use generic::*;
