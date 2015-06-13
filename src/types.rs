@@ -1,6 +1,7 @@
 use std::io;
 use std::result;
 use std::fmt;
+use std::borrow::Cow;
 
 use num::ToPrimitive;
 
@@ -23,16 +24,18 @@ impl<T: ToPrimitive, U: ToPrimitive> From<(T, U)> for Dimensions {
 
 #[derive(Debug)]
 pub enum Error {
-    InvalidFormat,
-    UnexpectedEndOfFile,
+    InvalidFormat(Option<Cow<'static, str>>),
+    UnexpectedEndOfFile(Option<Cow<'static, str>>),
     Io(io::Error)
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::InvalidFormat => write!(f, "invalid image format"),
-            Error::UnexpectedEndOfFile => write!(f, "unexpected end of file"),
+            Error::InvalidFormat(None) => write!(f, "invalid image format"),
+            Error::InvalidFormat(Some(ref s)) => write!(f, "invalid image format: {}", s),
+            Error::UnexpectedEndOfFile(None) => write!(f, "unexpected end of file"),
+            Error::UnexpectedEndOfFile(Some(ref s)) => write!(f, "unexpected end of file: {}", s),
             Error::Io(ref e) => write!(f, "I/O error: {}", e)
         }
     }
@@ -49,7 +52,7 @@ impl From<byteorder::Error> for Error {
     #[inline]
     fn from(e: byteorder::Error) -> Error {
         match e {
-            byteorder::Error::UnexpectedEOF => Error::UnexpectedEndOfFile,
+            byteorder::Error::UnexpectedEOF => Error::UnexpectedEndOfFile(None),
             byteorder::Error::Io(e) => Error::Io(e)
         }
     }
