@@ -1,8 +1,7 @@
 extern crate immeta;
 
 use immeta::{Dimensions, Metadata, MetadataBox};
-use immeta::formats::jpeg::JpegMetadata;
-use immeta::formats::png::{self, PngMetadata};
+use immeta::formats::{png, gif, jpeg};
 
 const OWLET_DIM: Dimensions = Dimensions {
     width: 1280,
@@ -17,7 +16,7 @@ fn test_jpeg() {
     assert_eq!(md.dimensions(), OWLET_DIM);
     assert_eq!(md.color_depth(), None);
 
-    let md = md.downcast::<JpegMetadata>().ok().expect("not JPEG metadata");
+    let md = md.downcast::<jpeg::Metadata>().ok().expect("not JPEG metadata");
     assert_eq!(md.dimensions, OWLET_DIM);
 }
 
@@ -29,7 +28,7 @@ fn test_png() {
     assert_eq!(md.dimensions(), OWLET_DIM);
     assert_eq!(md.color_depth(), Some(24));
 
-    let md = md.downcast::<PngMetadata>().ok().expect("not PNG metadata");
+    let md = md.downcast::<png::Metadata>().ok().expect("not PNG metadata");
     assert_eq!(md.dimensions, OWLET_DIM);
     assert_eq!(md.color_type, png::ColorType::Rgb);
     assert_eq!(md.color_depth, 24);
@@ -38,3 +37,43 @@ fn test_png() {
     assert_eq!(md.interlace_method, png::InterlaceMethod::Disabled);
 }
 
+
+#[test]
+fn test_gif_plain() {
+    let md = immeta::load_from_file("tests/images/owlet.gif").unwrap();
+
+    assert_eq!(md.mime_type(), "image/gif");
+    assert_eq!(md.dimensions(), OWLET_DIM);
+    assert_eq!(md.color_depth(), None);
+
+    let md = md.downcast::<gif::Metadata>().ok().expect("not GIF metadata");
+    assert_eq!(md.version, gif::Version::V89a);
+    assert_eq!(md.dimensions, OWLET_DIM);
+    assert_eq!(md.global_color_table, true);
+    assert_eq!(md.global_color_table_sorted, false);
+    assert_eq!(md.global_color_table_size, 256);
+    assert_eq!(md.color_resolution, 8);
+    assert_eq!(md.background_color_index, 0);
+    assert_eq!(md.pixel_aspect_ratio, 0);
+    assert_eq!(md.blocks, vec![
+        gif::Block::GraphicControlExtension(gif::GraphicControlExtension {
+            disposal_method: gif::DisposalMethod::None,
+            user_input: false,
+            transparent_color: false,
+            transparent_color_index: 0,
+            delay_time: 0
+        }),
+        gif::Block::ApplicationExtension(gif::ApplicationExtension {
+            application_identifier: *b"ImageMag",
+            authentication_code: *b"ick"
+        }),
+        gif::Block::ImageDescriptor(gif::ImageDescriptor {
+            left: 0, top: 0,
+            width: 1280, height: 857,
+            local_color_table: false,
+            local_color_table_sorted: false,
+            local_color_table_size: 0,
+            interlace: false
+        })
+    ])
+}

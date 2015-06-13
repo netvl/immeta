@@ -1,16 +1,16 @@
 use std::io::{self, Read, BufRead, ErrorKind};
 
 pub trait ReadExt: Read {
-    fn read_exact(&mut self, mut buf: &mut [u8]) -> io::Result<bool> {
+    fn read_exact(&mut self, mut buf: &mut [u8]) -> io::Result<usize> {
         let orig_len = buf.len() as u64;
-        io::copy(&mut self.take(orig_len), &mut buf).map(|n| n == orig_len)
+        io::copy(&mut self.take(orig_len), &mut buf).map(|r| r as usize)
     }
 }
 
 impl<R: ?Sized + Read> ReadExt for R {}
 
 pub trait BufReadExt: BufRead {
-    fn drop_exact(&mut self, n: u64) -> io::Result<u64> {
+    fn skip_exact(&mut self, n: u64) -> io::Result<u64> {
         let mut skipped = 0;
         loop {
             let available = match self.fill_buf() {
@@ -35,7 +35,7 @@ pub trait BufReadExt: BufRead {
         Ok(skipped)
     }
 
-    fn drop_until(&mut self, delim: u8) -> io::Result<usize> {
+    fn skip_until(&mut self, delim: u8) -> io::Result<usize> {
         let mut read = 0;
         loop {
             let (done, used) = {

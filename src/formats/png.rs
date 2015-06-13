@@ -3,7 +3,8 @@ use std::io::Read;
 use byteorder::{ReadBytesExt, BigEndian};
 
 use types::{Result, Dimensions};
-use traits::{Metadata, LoadableMetadata};
+use traits::Metadata as BaseMetadata;
+use traits::LoadableMetadata;
 use utils::ReadExt;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -105,7 +106,7 @@ impl InterlaceMethod {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct PngMetadata {
+pub struct Metadata {
     pub dimensions: Dimensions,
     pub color_type: ColorType,
     pub color_depth: u8,
@@ -114,7 +115,7 @@ pub struct PngMetadata {
     pub interlace_method: InterlaceMethod
 }
 
-impl Metadata for PngMetadata {
+impl BaseMetadata for Metadata {
     #[inline]
     fn dimensions(&self) -> Dimensions {
         self.dimensions
@@ -129,10 +130,10 @@ impl Metadata for PngMetadata {
     fn mime_type(&self) -> &'static str { "image/png" }
 }
 
-impl LoadableMetadata for PngMetadata {
-    fn load<R: ?Sized + Read>(r: &mut R) -> Result<PngMetadata> {
+impl LoadableMetadata for Metadata {
+    fn load<R: ?Sized + Read>(r: &mut R) -> Result<Metadata> {
         let mut signature = [0u8; 8];
-        if !try!(r.read_exact(&mut signature)) {
+        if try!(r.read_exact(&mut signature)) != signature.len() {
             return Err(unexpected_eof!("when reading PNG signature"))
         };
 
@@ -144,7 +145,7 @@ impl LoadableMetadata for PngMetadata {
         let _ = try!(r.read_u32::<BigEndian>().map_err(if_eof!("when reading chunk length")));
         
         let mut chunk_type = [0u8; 4];
-        if !try!(r.read_exact(&mut chunk_type)) {
+        if try!(r.read_exact(&mut chunk_type)) != chunk_type.len() {
             return Err(unexpected_eof!("when reading chunk type"));
         }
 
@@ -160,7 +161,7 @@ impl LoadableMetadata for PngMetadata {
         let filter_method = try!(r.read_u8().map_err(if_eof!("when reading filter method")));
         let interlace_method = try!(r.read_u8().map_err(if_eof!("when reading interlace method")));
 
-        Ok(PngMetadata {
+        Ok(Metadata {
             dimensions: (width, height).into(),
             color_type: try!(
                 ColorType::from_u8(color_type)

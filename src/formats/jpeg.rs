@@ -3,16 +3,17 @@ use std::io::{BufReader, Read};
 use byteorder::{ReadBytesExt, BigEndian};
 
 use types::{Result, Dimensions};
-use traits::{Metadata, LoadableMetadata};
+use traits::Metadata as BaseMetadata;
+use traits::LoadableMetadata;
 use utils::BufReadExt;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct JpegMetadata {
+pub struct Metadata {
     pub dimensions: Dimensions,
     // TODO: something else?
 }
 
-impl Metadata for JpegMetadata {
+impl BaseMetadata for Metadata {
     #[inline]
     fn mime_type(&self) -> &'static str { "image/jpeg" }
 
@@ -25,11 +26,11 @@ impl Metadata for JpegMetadata {
     fn color_depth(&self) -> Option<u8> { None }
 }
 
-impl LoadableMetadata for JpegMetadata {
-    fn load<R: ?Sized + Read>(r: &mut R) -> Result<JpegMetadata> {
+impl LoadableMetadata for Metadata {
+    fn load<R: ?Sized + Read>(r: &mut R) -> Result<Metadata> {
         let mut r = &mut BufReader::new(r);
         loop {
-            let bytes_read = try!(r.drop_until(0xff));
+            let bytes_read = try!(r.skip_until(0xff));
             if bytes_read == 0 {
                 return Err(unexpected_eof!("when searching for a marker"));
             }
@@ -59,13 +60,13 @@ impl LoadableMetadata for JpegMetadata {
             };
 
             if let Some(dimensions) = dimensions {
-                return Ok(JpegMetadata {
+                return Ok(Metadata {
                     dimensions: dimensions.into()
                 });
             }
             
             let size = size as u64;
-            if try!(r.drop_exact(size)) != size {
+            if try!(r.skip_exact(size)) != size {
                 return Err(unexpected_eof!("when skipping marker payload"));
             }
         }
