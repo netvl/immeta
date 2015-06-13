@@ -360,9 +360,6 @@ impl BaseMetadata for Metadata {
     fn dimensions(&self) -> Dimensions {
         self.dimensions
     }
-
-    #[inline]
-    fn color_depth(&self) -> Option<u8> { None }
 }
 
 impl LoadableMetadata for Metadata {

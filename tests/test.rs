@@ -19,7 +19,6 @@ fn test_jpeg() {
 
     assert_eq!(md.mime_type(), "image/jpeg");
     assert_eq!(md.dimensions(), OWLET_DIM);
-    assert_eq!(md.color_depth(), None);
 
     let md = md.downcast::<jpeg::Metadata>().ok().expect("not JPEG metadata");
     assert_eq!(md.dimensions, OWLET_DIM);
@@ -31,7 +30,6 @@ fn test_png() {
 
     assert_eq!(md.mime_type(), "image/png");
     assert_eq!(md.dimensions(), OWLET_DIM);
-    assert_eq!(md.color_depth(), Some(24));
 
     let md = md.downcast::<png::Metadata>().ok().expect("not PNG metadata");
     assert_eq!(md.dimensions, OWLET_DIM);
@@ -49,7 +47,6 @@ fn test_gif_plain() {
 
     assert_eq!(md.mime_type(), "image/gif");
     assert_eq!(md.dimensions(), OWLET_DIM);
-    assert_eq!(md.color_depth(), None);
 
     let md = md.downcast::<gif::Metadata>().ok().expect("not GIF metadata");
     assert_eq!(md.version, gif::Version::V89a);
@@ -89,7 +86,6 @@ fn test_gif_animated() {
 
     assert_eq!(md.mime_type(), "image/gif");
     assert_eq!(md.dimensions(), DROP_DIM);
-    assert_eq!(md.color_depth(), None);
 
     let md = md.downcast::<gif::Metadata>().ok().expect("not GIF metadata");
     assert_eq!(md.version, gif::Version::V89a);

@@ -122,11 +122,6 @@ impl BaseMetadata for Metadata {
     }
 
     #[inline]
-    fn color_depth(&self) -> Option<u8> {
-        Some(self.color_depth)
-    }
-
-    #[inline]
     fn mime_type(&self) -> &'static str { "image/png" }
 }
 
