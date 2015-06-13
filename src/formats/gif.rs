@@ -360,6 +360,28 @@ impl BaseMetadata for Metadata {
     fn dimensions(&self) -> Dimensions {
         self.dimensions
     }
+
+    #[inline]
+    fn color_depth(&self) -> Option<u8> {
+        None
+    }
+
+    #[inline]
+    fn animation_info(&self) -> Option<AnimationInfo> {
+        let frames_number = self.frames_number();
+        if frames_number > 1 {
+            Some(AnimationInfo {
+                frames: frames_number
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    fn is_lossy(&self) -> bool {
+        false
+    }
 }
 
 impl LoadableMetadata for Metadata {

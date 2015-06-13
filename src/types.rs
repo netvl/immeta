@@ -7,21 +7,6 @@ use num::ToPrimitive;
 
 use byteorder;
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub struct Dimensions {
-    pub width: u32,
-    pub height: u32
-}
-
-impl<T: ToPrimitive, U: ToPrimitive> From<(T, U)> for Dimensions {
-    fn from((w, h): (T, U)) -> Dimensions {
-        Dimensions {
-            width: w.to_u32().unwrap(),
-            height: h.to_u32().unwrap()
-        }
-    }
-}
-
 #[derive(Debug)]
 pub enum Error {
     InvalidFormat(Option<Cow<'static, str>>),
@@ -59,3 +44,23 @@ impl From<byteorder::Error> for Error {
 }
 
 pub type Result<T> = result::Result<T, Error>;
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub struct Dimensions {
+    pub width: u32,
+    pub height: u32
+}
+
+impl<T: ToPrimitive, U: ToPrimitive> From<(T, U)> for Dimensions {
+    fn from((w, h): (T, U)) -> Dimensions {
+        Dimensions {
+            width: w.to_u32().unwrap(),
+            height: h.to_u32().unwrap()
+        }
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct AnimationInfo {
+    frames: u64
+}

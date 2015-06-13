@@ -3,7 +3,7 @@
 extern crate byteorder;
 extern crate num;
 
-pub use types::{Dimensions, Error, Result};
+pub use types::{Error, Result, Dimensions, AnimationInfo};
 pub use traits::*;
 pub use generic::*;
 

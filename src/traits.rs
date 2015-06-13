@@ -11,6 +11,13 @@ use types::{Result, Dimensions};
 pub trait Metadata: Any + Send {
     fn mime_type(&self) -> &'static str;
     fn dimensions(&self) -> Dimensions;
+    fn color_depth(&self) -> Option<u8>;
+    fn animation_info(&self) -> Option<AnimationInfo>;
+    fn is_lossy(&self) -> bool;
+
+    fn is_animated(&self) -> bool {
+        self.animation_info().is_some()
+    }
 }
 
 impl Metadata {
