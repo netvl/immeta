@@ -123,10 +123,15 @@ pub struct GraphicControlExtension {
     pub transparent_color: bool,
     pub transparent_color_index: u8,
 
-    pub delay_time: u16
+    pub delay_time: u16  // 1/100th of second
 }
 
 impl GraphicControlExtension {
+    #[inline]
+    pub fn delay_ms(&self) -> u32 {
+        self.delay_time as u32 * 10
+    }
+
     fn load<R: ?Sized + BufRead>(index: usize, r: &mut R) -> Result<GraphicControlExtension> {
         const NAME: &'static str = "graphics control extension block";
 
@@ -325,6 +330,21 @@ pub struct Metadata {
     pub blocks: Vec<Block>
 }
 
+impl Metadata {
+    #[inline]
+    pub fn frames_number(&self) -> usize {
+        self.blocks.iter().filter(|b| match **b {
+            Block::ImageDescriptor(_) => true,
+            _ => false
+        }).count()
+    }
+
+    #[inline]
+    pub fn is_animated(&self) -> bool {
+        // TODO: is this right?
+        self.frames_number() > 1
+    }
+}
 
 impl BaseMetadata for Metadata {
     #[inline]

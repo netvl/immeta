@@ -8,6 +8,11 @@ const OWLET_DIM: Dimensions = Dimensions {
     height: 857
 };
 
+const DROP_DIM: Dimensions = Dimensions {
+    width: 238,
+    height: 212
+};
+
 #[test]
 fn test_jpeg() {
     let md = immeta::load_from_file("tests/images/owlet.jpg").unwrap();
@@ -55,6 +60,8 @@ fn test_gif_plain() {
     assert_eq!(md.color_resolution, 8);
     assert_eq!(md.background_color_index, 0);
     assert_eq!(md.pixel_aspect_ratio, 0);
+    assert_eq!(md.frames_number(), 1);
+    assert_eq!(md.is_animated(), false);
     assert_eq!(md.blocks, vec![
         gif::Block::GraphicControlExtension(gif::GraphicControlExtension {
             disposal_method: gif::DisposalMethod::None,
@@ -76,4 +83,78 @@ fn test_gif_plain() {
             interlace: false
         })
     ])
+}
+
+#[test]
+fn test_gif_animated() {
+    let md = immeta::load_from_file("tests/images/drop.gif").unwrap();
+
+    assert_eq!(md.mime_type(), "image/gif");
+    assert_eq!(md.dimensions(), DROP_DIM);
+    assert_eq!(md.color_depth(), None);
+
+    let md = md.downcast::<gif::Metadata>().ok().expect("not GIF metadata");
+    assert_eq!(md.version, gif::Version::V89a);
+    assert_eq!(md.dimensions, DROP_DIM);
+    assert_eq!(md.global_color_table, true);
+    assert_eq!(md.global_color_table_sorted, false);
+    assert_eq!(md.global_color_table_size, 256);
+    assert_eq!(md.color_resolution, 7);
+    assert_eq!(md.background_color_index, 255);
+    assert_eq!(md.pixel_aspect_ratio, 0);
+    assert_eq!(md.frames_number(), 30);
+    assert_eq!(md.is_animated(), true);
+
+    let mut blocks = md.blocks.iter();
+
+    assert_eq!(
+        blocks.next().unwrap(),
+        &gif::Block::ApplicationExtension(gif::ApplicationExtension {
+            application_identifier: *b"NETSCAPE",
+            authentication_code: *b"2.0"
+        })
+    );
+
+    assert_eq!(
+        blocks.next().unwrap(),
+        &gif::Block::CommentExtension(gif::CommentExtension)
+    );
+
+    for i in 0..30 {
+        match blocks.next() {
+            Some(&gif::Block::GraphicControlExtension(ref gce)) => {
+                assert_eq!(
+                    gce,
+                    &gif::GraphicControlExtension {
+                        disposal_method: if i == 29 { 
+                            gif::DisposalMethod::None 
+                        } else { 
+                            gif::DisposalMethod::DoNotDispose
+                        },
+                        user_input: false,
+                        transparent_color: true,
+                        transparent_color_index: 255,
+                        delay_time: 7
+                    }
+                );
+                assert_eq!(gce.delay_ms(), 70);
+            }
+            _ => panic!("Invalid block")
+        }
+        
+
+        assert_eq!(
+            blocks.next().unwrap(),
+            &gif::Block::ImageDescriptor(gif::ImageDescriptor {
+                left: 0, top: 0,
+                width: 238, height: 212,
+                local_color_table: false,
+                local_color_table_sorted: false,
+                local_color_table_size: 0,
+                interlace: false
+            })
+        );
+    }
+
+    assert!(blocks.next().is_none());
 }
