@@ -1,6 +1,6 @@
 extern crate immeta;
 
-use immeta::{Dimensions, Metadata, MetadataBox};
+use immeta::Dimensions;
 use immeta::formats::{png, gif, jpeg};
 
 const OWLET_DIM: Dimensions = Dimensions {

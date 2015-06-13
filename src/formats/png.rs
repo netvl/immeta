@@ -3,7 +3,6 @@ use std::io::Read;
 use byteorder::{ReadBytesExt, BigEndian};
 
 use types::{Result, Dimensions};
-use traits::Metadata as BaseMetadata;
 use traits::LoadableMetadata;
 use utils::ReadExt;
 
@@ -115,16 +114,6 @@ pub struct Metadata {
     pub interlace_method: InterlaceMethod
 }
 
-impl BaseMetadata for Metadata {
-    #[inline]
-    fn dimensions(&self) -> Dimensions {
-        self.dimensions
-    }
-
-    #[inline]
-    fn mime_type(&self) -> &'static str { "image/png" }
-}
-
 impl LoadableMetadata for Metadata {
     fn load<R: ?Sized + Read>(r: &mut R) -> Result<Metadata> {
         let mut signature = [0u8; 8];
@@ -181,3 +170,5 @@ impl LoadableMetadata for Metadata {
         })
     }
 }
+
+impl_from_generic_metadata! { Metadata, Png }

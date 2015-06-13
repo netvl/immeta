@@ -1,12 +1,9 @@
 macro_rules! invalid_format {
-    () => {
-        $crate::types::Error::InvalidFormat(None)
-    };
     ($s:expr) => { 
-        $crate::types::Error::InvalidFormat(Some($s.into()))
+        $crate::types::Error::InvalidFormat($s.into())
     };
     ($fmt:expr, $($args:tt)*) => { 
-        $crate::types::Error::InvalidFormat(Some(format!($fmt, $($args)*).into()))
+        $crate::types::Error::InvalidFormat(format!($fmt, $($args)*).into())
     }
 }
 

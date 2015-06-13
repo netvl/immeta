@@ -5,11 +5,9 @@ use std::borrow::Cow;
 
 use num::ToPrimitive;
 
-use byteorder;
-
 #[derive(Debug)]
 pub enum Error {
-    InvalidFormat(Option<Cow<'static, str>>),
+    InvalidFormat(Cow<'static, str>),
     UnexpectedEndOfFile(Option<Cow<'static, str>>),
     Io(io::Error)
 }
@@ -17,8 +15,7 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::InvalidFormat(None) => write!(f, "invalid image format"),
-            Error::InvalidFormat(Some(ref s)) => write!(f, "invalid image format: {}", s),
+            Error::InvalidFormat(ref s) => write!(f, "invalid image format: {}", s),
             Error::UnexpectedEndOfFile(None) => write!(f, "unexpected end of file"),
             Error::UnexpectedEndOfFile(Some(ref s)) => write!(f, "unexpected end of file: {}", s),
             Error::Io(ref e) => write!(f, "I/O error: {}", e)
@@ -33,12 +30,12 @@ impl From<io::Error> for Error {
     }
 }
 
-impl From<byteorder::Error> for Error {
+impl From<::byteorder::Error> for Error {
     #[inline]
-    fn from(e: byteorder::Error) -> Error {
+    fn from(e: ::byteorder::Error) -> Error {
         match e {
-            byteorder::Error::UnexpectedEOF => Error::UnexpectedEndOfFile(None),
-            byteorder::Error::Io(e) => Error::Io(e)
+            ::byteorder::Error::UnexpectedEOF => Error::UnexpectedEndOfFile(None),
+            ::byteorder::Error::Io(e) => Error::Io(e)
         }
     }
 }
@@ -58,9 +55,4 @@ impl<T: ToPrimitive, U: ToPrimitive> From<(T, U)> for Dimensions {
             height: h.to_u32().unwrap()
         }
     }
-}
-
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub struct AnimationInfo {
-    frames: u64
 }

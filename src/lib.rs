@@ -1,16 +1,14 @@
-#![feature(core, alloc)]
-
 extern crate byteorder;
 extern crate num;
 
-pub use types::{Error, Result, Dimensions, AnimationInfo};
+pub use types::*;
 pub use traits::*;
 pub use generic::*;
 
 #[macro_use] mod macros;
+#[macro_use] mod generic;
 mod traits;
 mod types;
 mod utils;
-mod generic;
 
 pub mod formats;

@@ -3,7 +3,6 @@ use std::io::{BufReader, Read};
 use byteorder::{ReadBytesExt, BigEndian};
 
 use types::{Result, Dimensions};
-use traits::Metadata as BaseMetadata;
 use traits::LoadableMetadata;
 use utils::BufReadExt;
 
@@ -11,16 +10,6 @@ use utils::BufReadExt;
 pub struct Metadata {
     pub dimensions: Dimensions,
     // TODO: something else?
-}
-
-impl BaseMetadata for Metadata {
-    #[inline]
-    fn mime_type(&self) -> &'static str { "image/jpeg" }
-
-    #[inline]
-    fn dimensions(&self) -> Dimensions {
-        self.dimensions
-    }
 }
 
 impl LoadableMetadata for Metadata {
@@ -68,3 +57,4 @@ impl LoadableMetadata for Metadata {
     }
 }
 
+impl_from_generic_metadata! { Metadata, Jpeg }

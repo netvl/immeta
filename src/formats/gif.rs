@@ -4,7 +4,6 @@ use std::borrow::Cow;
 use byteorder::{ReadBytesExt, LittleEndian};
 
 use types::{Result, Dimensions};
-use traits::Metadata as BaseMetadata;
 use traits::LoadableMetadata;
 use utils::{ReadExt, BufReadExt};
 
@@ -352,38 +351,6 @@ impl Metadata {
     }
 }
 
-impl BaseMetadata for Metadata {
-    #[inline]
-    fn mime_type(&self) -> &'static str { "image/gif" }
-
-    #[inline]
-    fn dimensions(&self) -> Dimensions {
-        self.dimensions
-    }
-
-    #[inline]
-    fn color_depth(&self) -> Option<u8> {
-        None
-    }
-
-    #[inline]
-    fn animation_info(&self) -> Option<AnimationInfo> {
-        let frames_number = self.frames_number();
-        if frames_number > 1 {
-            Some(AnimationInfo {
-                frames: frames_number
-            })
-        } else {
-            None
-        }
-    }
-
-    #[inline]
-    fn is_lossy(&self) -> bool {
-        false
-    }
-}
-
 impl LoadableMetadata for Metadata {
     fn load<R: ?Sized + Read>(r: &mut R) -> Result<Metadata> {
         let mut r = BufReader::new(r);
@@ -467,3 +434,5 @@ impl LoadableMetadata for Metadata {
         })
     }
 }
+
+impl_from_generic_metadata! { Metadata, Gif }
