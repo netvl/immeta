@@ -18,7 +18,11 @@ script:
   - |
       travis-cargo build &&
       travis-cargo test &&
-      travis-cargo --only stable doc
+      travis-cargo --only beta doc
 
 after_success:
-  - travis-cargo --only stable doc-upload
+  - travis-cargo --only beta doc-upload
+
+env:
+  global:
+    - TRAVIS_CARGO_NIGHTLY_FEATURE=""
