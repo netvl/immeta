@@ -2,6 +2,12 @@
 name = "immeta"
 version = "0.1.0"
 authors = ["Vladimir Matveev <vladimir.matweev@gmail.com>"]
+description = "An image metadata parsing library"
+license = "MIT"
+repository = "https://github.com/netvl/immeta"
+documentation = "http://netvl.github.io/immeta/"
+readme = "Readme.md"
+keywords = ["image", "metadata"]
 
 [dependencies]
 byteorder = "*"
