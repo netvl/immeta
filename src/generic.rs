@@ -151,6 +151,6 @@ pub fn load_from_file<P: AsRef<Path>>(p: P) -> Result<GenericMetadata> {
 ///
 /// This method delegates to `load()` method and, consequently, also determines the image format
 /// automatically.
-pub fn load_from_buf(mut b: &[u8]) -> Result<GenericMetadata> {
+pub fn load_from_buf(b: &[u8]) -> Result<GenericMetadata> {
     load(&mut Cursor::new(b))
 }

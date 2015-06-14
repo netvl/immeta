@@ -1,3 +1,5 @@
+//! Metadata of JPEG images.
+
 use std::io::{BufReader, Read};
 
 use byteorder::{ReadBytesExt, BigEndian};
@@ -6,8 +8,12 @@ use types::{Result, Dimensions};
 use traits::LoadableMetadata;
 use utils::BufReadExt;
 
+/// Represents metadata of a JPEG image.
+///
+/// Currently it is very basic and only provides access to image dimensions.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Metadata {
+    /// Image size.
     pub dimensions: Dimensions,
     // TODO: something else?
 }

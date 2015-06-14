@@ -1,3 +1,5 @@
+//! Metadata for PNG images.
+
 use std::io::Read;
 
 use byteorder::{ReadBytesExt, BigEndian};
@@ -6,6 +8,9 @@ use types::{Result, Dimensions};
 use traits::LoadableMetadata;
 use utils::ReadExt;
 
+/// Color type used in an image.
+///
+/// These color types directly corresponds to those defined in PNG spec.
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum ColorType {
     Grayscale,
@@ -60,6 +65,12 @@ fn compute_color_depth(bit_depth: u8, color_type: u8) -> Option<u8> {
     }
 }
 
+/// Compression method used in an image.
+///
+/// PNG spec currently defines only one compression method:
+///
+/// > At present, only compression method 0 (deflate/inflate compression with a sliding window of
+/// at most 32768 bytes) is defined.
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum CompressionMethod {
     DeflateInflate
@@ -74,6 +85,12 @@ impl CompressionMethod {
     }
 }
 
+/// Filtering method used in an image.
+///
+/// PNG spec currently defines only one filter method:
+///
+/// > At present, only filter method 0 (adaptive filtering with five basic filter types) is
+/// defined.
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum FilterMethod {
     AdaptiveFiltering
@@ -88,6 +105,9 @@ impl FilterMethod {
     }
 }
 
+/// Interlace method used in an image.
+///
+/// PNG spec says that interlacing can be disabled or Adam7 interlace method can be used.
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum InterlaceMethod {
     Disabled,
@@ -104,13 +124,20 @@ impl InterlaceMethod {
     }
 }
 
+/// Represents metadata of a PNG image.
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Metadata {
+    /// Width and height.
     pub dimensions: Dimensions,
+    /// Color type used in the image.
     pub color_type: ColorType,
+    /// Color depth (bits per pixel) used in the image.
     pub color_depth: u8,
+    /// Compression method used in the image.
     pub compression_method: CompressionMethod,
+    /// Preprocessing method used in the image.
     pub filter_method: FilterMethod,
+    /// Transmission order used in the image.
     pub interlace_method: InterlaceMethod
 }
 

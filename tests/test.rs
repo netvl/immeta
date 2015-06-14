@@ -55,7 +55,7 @@ fn test_gif_plain() {
         size: 256,
         sorted: false
     }));
-    assert_eq!(md.color_resolution, 8);
+    assert_eq!(md.color_resolution, 256);
     assert_eq!(md.background_color_index, 0);
     assert_eq!(md.pixel_aspect_ratio, 0);
     assert_eq!(md.frames_number(), 1);
@@ -94,7 +94,7 @@ fn test_gif_animated() {
         size: 256,
         sorted: false
     }));
-    assert_eq!(md.color_resolution, 7);
+    assert_eq!(md.color_resolution, 128);
     assert_eq!(md.background_color_index, 255);
     assert_eq!(md.pixel_aspect_ratio, 0);
     assert_eq!(md.frames_number(), 30);
@@ -131,7 +131,7 @@ fn test_gif_animated() {
                         delay_time: 7
                     }
                 );
-                assert_eq!(gce.delay_ms(), 70);
+                assert_eq!(gce.delay_time_ms(), 70);
             }
             _ => panic!("Invalid block")
         }
