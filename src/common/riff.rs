@@ -147,7 +147,7 @@ impl<'a> RiffListChunk<'a> {
 
     #[inline]
     pub fn next(&mut self) -> Option<Result<RiffChunk>> {
-        if self.cur_chunk_len < self.cur_chunk_read {
+        if self.cur_chunk_read < self.cur_chunk_len {
             let to_skip = (self.cur_chunk_len - self.cur_chunk_read) as u64;
             match self.data.skip_exact_0(to_skip) {
                 Ok(n) if n == to_skip => {}
@@ -193,7 +193,7 @@ fn read_id_and_len<R: Read>(source: &mut R) -> Result<Option<(ChunkId, u32)>> {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Write;
+    use std::io::{Read, Write};
 
     use byteorder::{WriteBytesExt, LittleEndian};
 
@@ -322,7 +322,51 @@ mod tests {
             }
 
             check_next_chunk(&mut chunk, ChunkId(*b"E   "), 3, b"fuz");
+
+            assert!(chunk.next().is_none());
         }
 
+        assert!(root.next().is_none());
+    }
+
+    #[test]
+    fn test_skip_chunk_data() {
+        let data = build! {
+            b"RIFF", &n(77), b"abcd",
+            b"A   ", &n(10), b"abcdefghij",
+            b" B  ", &n(12), b"123456789012",
+            b"  C ", &n(8),  b"ABCDEFGH"
+        };
+        let mut data: &[u8] = &data;
+
+        let mut r = RiffReader::new(&mut data);
+
+        let root = r.root().unwrap();
+        let mut root = root.into_list().ok().unwrap().unwrap();
+
+        {
+            let mut chunk = root.next().unwrap().unwrap();
+            assert_eq!(chunk.chunk_id(), ChunkId(*b"A   "));
+            assert_eq!(chunk.len(), 10);
+            assert_eq!(
+                (&mut chunk.contents() as &mut Read).take(5).read_to_vec().unwrap(),
+                b"abcde".to_owned()
+            );
+        }
+
+        {
+            let chunk = root.next().unwrap().unwrap();
+            assert_eq!(chunk.chunk_id(), ChunkId(*b" B  "));
+            assert_eq!(chunk.len(), 12);
+        }
+
+        {
+            let mut chunk = root.next().unwrap().unwrap();
+            assert_eq!(chunk.chunk_id(), ChunkId(*b"  C "));
+            assert_eq!(chunk.len(), 8);
+            assert_eq!(chunk.contents().read_to_vec().unwrap(), b"ABCDEFGH".to_owned());
+        }
+
+        assert!(root.next().is_none());
     }
 }
