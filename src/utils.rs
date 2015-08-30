@@ -5,6 +5,16 @@ pub trait ReadExt: Read {
         let orig_len = buf.len() as u64;
         io::copy(&mut self.take(orig_len), &mut buf).map(|r| r as usize)
     }
+
+    fn skip_exact_0(&mut self, n: u64) -> io::Result<u64> {
+        io::copy(&mut self.take(n), &mut io::sink())
+    }
+
+    fn read_to_vec(&mut self) -> io::Result<Vec<u8>> {
+        let mut buf = Vec::new();
+        try!(self.read_to_end(&mut buf));
+        Ok(buf)
+    }
 }
 
 impl<R: ?Sized + Read> ReadExt for R {}
