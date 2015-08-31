@@ -588,5 +588,3 @@ impl LoadableMetadata for Metadata {
         })
     }
 }
-
-impl_from_generic_metadata! { Metadata, Gif }
