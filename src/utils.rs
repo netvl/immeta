@@ -1,7 +1,7 @@
 use std::io::{self, Read, BufRead, ErrorKind};
 
 pub trait ReadExt: Read {
-    fn read_exact(&mut self, mut buf: &mut [u8]) -> io::Result<usize> {
+    fn read_exact_0(&mut self, mut buf: &mut [u8]) -> io::Result<usize> {
         let orig_len = buf.len() as u64;
         io::copy(&mut self.take(orig_len), &mut buf).map(|r| r as usize)
     }

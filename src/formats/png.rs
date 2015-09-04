@@ -144,7 +144,7 @@ pub struct Metadata {
 impl LoadableMetadata for Metadata {
     fn load<R: ?Sized + Read>(r: &mut R) -> Result<Metadata> {
         let mut signature = [0u8; 8];
-        if try!(r.read_exact(&mut signature)) != signature.len() {
+        if try!(r.read_exact_0(&mut signature)) != signature.len() {
             return Err(unexpected_eof!("when reading PNG signature"))
         };
 
@@ -156,7 +156,7 @@ impl LoadableMetadata for Metadata {
         let _ = try!(r.read_u32::<BigEndian>().map_err(if_eof!("when reading chunk length")));
         
         let mut chunk_type = [0u8; 4];
-        if try!(r.read_exact(&mut chunk_type)) != chunk_type.len() {
+        if try!(r.read_exact_0(&mut chunk_type)) != chunk_type.len() {
             return Err(unexpected_eof!("when reading chunk type"));
         }
 

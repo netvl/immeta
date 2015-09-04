@@ -11,6 +11,7 @@ Currently the following image formats are supported:
  * JPEG
  * PNG 1.2
  * GIF (87a and 89a)
+ * WEBP
 
 Support for more will come in future versions.
 

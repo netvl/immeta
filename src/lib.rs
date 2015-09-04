@@ -43,6 +43,6 @@ pub use generic::*;
 mod traits;
 mod types;
 mod utils;
-mod common;
 
+pub mod common;
 pub mod formats;

@@ -5,7 +5,7 @@ use std::result;
 
 use types::{Result, Dimensions};
 use traits::LoadableMetadata;
-use formats::{jpeg, png, gif};
+use formats::{jpeg, png, gif, webp};
 use generic::markers::MetadataMarker;
 
 /// Contains metadata marker types.
@@ -43,7 +43,7 @@ pub mod markers {
 
     use generic::GenericMetadata;
     use types::Result;
-    use formats::{jpeg, png, gif};
+    use formats::{jpeg, png, gif, webp};
 
     /// A marker trait for specific metadata type.
     pub trait MetadataMarker {
@@ -196,6 +196,7 @@ pub mod markers {
     impl_metadata_marker! { Jpeg, Jpeg, jpeg::Metadata }
     impl_metadata_marker! { Png, Png, png::Metadata }
     impl_metadata_marker! { Gif, Gif, gif::Metadata }
+    impl_metadata_marker! { Webp, Webp, webp::Metadata }
 }
 
 /// Represents metadata loaded from a file whose format was determined automatically.
@@ -204,27 +205,19 @@ pub mod markers {
 pub enum GenericMetadata {
     Png(png::Metadata),
     Gif(gif::Metadata),
-    Jpeg(jpeg::Metadata)
-}
-
-macro_rules! gen_access {
-    ($_self:ident; $($variant:ident),+; $field:ident) => {
-        match *$_self {
-            $($crate::generic::GenericMetadata::$variant(ref md) => md.$field,)+
-        }
-    };
-    ($_self:ident; $($variant:ident),+; $field:ident; $wrap:expr; $otherwise:expr) => {
-        match *$_self {
-            $($crate::generic::GenericMetadata::$variant(ref md) => $wrap(md.$field),)+
-            _ => $otherwise
-        }
-    }
+    Jpeg(jpeg::Metadata),
+    Webp(webp::Metadata)
 }
 
 impl GenericMetadata {
     /// Returns image dimensions from the contained metadata.
     pub fn dimensions(&self) -> Dimensions {
-        gen_access!(self; Png, Gif, Jpeg; dimensions)
+        match *self {
+            GenericMetadata::Png(ref md) => md.dimensions,
+            GenericMetadata::Gif(ref md) => md.dimensions,
+            GenericMetadata::Jpeg(ref md) => md.dimensions,
+            GenericMetadata::Webp(ref md) => md.dimensions()
+        }
     }
 
     /// Returns a MIME type string for the image type of the contained metadata.
@@ -232,7 +225,8 @@ impl GenericMetadata {
         match *self {
             GenericMetadata::Png(_) => "image/png",
             GenericMetadata::Gif(_) => "image/gif",
-            GenericMetadata::Jpeg(_) => "image/jpeg"
+            GenericMetadata::Jpeg(_) => "image/jpeg",
+            GenericMetadata::Webp(_) => "image/webp"
         }
     }
 
@@ -272,6 +266,12 @@ pub fn load<R: ?Sized + Read + Seek>(r: &mut R) -> Result<GenericMetadata> {
     try!(r.seek(SeekFrom::Start(0)));
     if let Ok(md) = gif::Metadata::load(r) {
         return Ok(GenericMetadata::Gif(md));
+    }
+
+    // try webp
+    try!(r.seek(SeekFrom::Start(0)));
+    if let Ok(md) = webp::Metadata::load(r) {
+        return Ok(GenericMetadata::Webp(md));
     }
 
     // try jpeg

@@ -2,7 +2,7 @@ extern crate immeta;
 
 use immeta::Dimensions;
 use immeta::formats::{png, gif};
-use immeta::markers::{Png, Gif, Jpeg};
+use immeta::markers::{Png, Gif, Jpeg, Webp};
 
 const OWLET_DIM: Dimensions = Dimensions {
     width: 1280,
@@ -12,6 +12,11 @@ const OWLET_DIM: Dimensions = Dimensions {
 const DROP_DIM: Dimensions = Dimensions {
     width: 238,
     height: 212
+};
+
+const CHERRY_DIM: Dimensions = Dimensions {
+    width: 1024,
+    height: 772
 };
 
 #[test]
@@ -151,4 +156,16 @@ fn test_gif_animated() {
     }
 
     assert!(blocks.next().is_none());
+}
+
+#[test]
+fn test_webp() {
+    let md = immeta::load_from_file("tests/images/cherry.webp").unwrap();
+
+    assert_eq!(md.mime_type(), "image/webp");
+    assert_eq!(md.dimensions(), CHERRY_DIM);
+
+    let md = md.into::<Webp>().ok().expect("not WEBP metadata");
+
+    println!("{:?}", md);
 }

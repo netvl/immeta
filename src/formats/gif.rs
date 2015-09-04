@@ -387,12 +387,12 @@ impl ApplicationExtension {
         }
 
         let mut application_identifier = [0u8; 8];
-        if try!(r.read_exact(&mut application_identifier)) != application_identifier.len() {
+        if try!(r.read_exact_0(&mut application_identifier)) != application_identifier.len() {
             return Err(unexpected_eof!("while reading application identifier in {} {}", NAME, index));
         }
 
         let mut authentication_code = [0u8; 3];
-        if try!(r.read_exact(&mut authentication_code)) != authentication_code.len() {
+        if try!(r.read_exact_0(&mut authentication_code)) != authentication_code.len() {
             return Err(unexpected_eof!("while reading authentication code in {} {}", NAME, index));
         }
 
@@ -510,7 +510,7 @@ impl LoadableMetadata for Metadata {
         let mut r = BufReader::new(r);
 
         let mut signature = [0u8; 6];
-        if try!(r.read_exact(&mut signature)) != signature.len() {
+        if try!(r.read_exact_0(&mut signature)) != signature.len() {
             return Err(unexpected_eof!("when reading GIF signature"));
         }
 
