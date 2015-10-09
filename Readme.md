@@ -23,11 +23,22 @@ Just add a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-immeta = "*"
+immeta = "0.2"
 ```
 
 You can see an example on how to use it in `tests/test.rs`.
 
+
+## Changelog
+
+### Version 0.2.0
+
+* Added basic support for WEBP format, along with RIFF utils
+* Improved API
+
+### Version 0.1.0
+
+* Initial release, support for GIF, PNG and JPEG
 
 ## License
 

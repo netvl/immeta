@@ -10,5 +10,5 @@ readme = "Readme.md"
 keywords = ["image", "metadata"]
 
 [dependencies]
-byteorder = "*"
-num = "*"
+byteorder = "0.3"
+num = { version = "0.1", default-features = false }  # we don't need bigint and others here
