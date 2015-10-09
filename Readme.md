@@ -1,7 +1,10 @@
 immeta, an image metadata inspection library in Rust
 ====================================================
 
-[![Build Status](https://travis-ci.org/netvl/immeta.svg?branch=master)](https://travis-ci.org/netvl/immeta) [![crates.io](https://img.shields.io/crates/v/immeta.svg)](https://crates.io/crates/immeta)
+[![Build Status][travis]](https://travis-ci.org/netvl/immeta) [![crates.io][crates]](https://crates.io/crates/immeta)
+
+  [travis]: https://img.shields.io/travis/netvl/immeta.svg?style=flat-square
+  [crates]: https://img.shields.io/crates/v/immeta.svg?style=flat-square
 
 [Documentation](https://netvl.github.io/immeta/)
 
