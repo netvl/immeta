@@ -2,6 +2,7 @@ use std::io;
 use std::result;
 use std::fmt;
 use std::borrow::Cow;
+use std::error;
 
 use num::ToPrimitive;
 
@@ -31,6 +32,23 @@ impl fmt::Display for Error {
             Error::UnexpectedEndOfFile(None) => write!(f, "unexpected end of file"),
             Error::UnexpectedEndOfFile(Some(ref s)) => write!(f, "unexpected end of file: {}", s),
             Error::Io(ref e) => write!(f, "I/O error: {}", e)
+        }
+    }
+}
+
+impl error::Error for Error {
+    fn description(&self) -> &str {
+        match *self {
+            Error::InvalidFormat(_) => "invalid image format",
+            Error::UnexpectedEndOfFile(_) => "unexpected end of file",
+            Error::Io(_) => "i/o error"
+        }
+    }
+
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            Error::Io(ref e) => Some(e),
+            _ => None
         }
     }
 }

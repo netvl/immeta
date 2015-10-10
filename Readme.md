@@ -34,6 +34,10 @@ You can see an example on how to use it in `tests/test.rs`.
 
 ## Changelog
 
+### Version 0.2.1
+
+* Added `std::error::Error` implementation for `immeta::Error` to facilitate interoperation with other code
+
 ### Version 0.2.0
 
 * Added basic support for WEBP format, along with RIFF utils
