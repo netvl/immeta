@@ -202,6 +202,7 @@ pub mod markers {
 /// Represents metadata loaded from a file whose format was determined automatically.
 ///
 /// Values of this type are obtained via `immeta::load()` function and its derivatives.
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum GenericMetadata {
     Png(png::Metadata),
     Gif(gif::Metadata),
