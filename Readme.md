@@ -34,6 +34,10 @@ You can see an example on how to use it in `tests/test.rs`.
 
 ## Changelog
 
+### Version 0.2.3
+
+* Bumped byteorder dependency up to 0.4
+
 ### Version 0.2.2
 
 * Added missing `Debug`, `Clone`, `Eq` and `PartialEq` implementations for `GenericMetadata`
