@@ -121,7 +121,7 @@ impl ImageDescriptor {
         };
 
         if local_color_table {
-            let skip_size = local_color_table_size as u64;
+            let skip_size = local_color_table_size as u64 * 3;
             if try!(r.skip_exact(skip_size)) != skip_size {
                 return Err(unexpected_eof!("when reading color table of image block {}", index));
             }

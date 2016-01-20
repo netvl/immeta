@@ -34,6 +34,10 @@ You can see an example on how to use it in `tests/test.rs`.
 
 ## Changelog
 
+### Version 0.2.4
+
+* Fixed GIF local color table parsing
+
 ### Version 0.2.3
 
 * Bumped byteorder dependency up to 0.4
