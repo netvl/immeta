@@ -243,7 +243,9 @@ pub enum DisposalMethod {
     RestoreToBackgroundColor,
     /// The decoder is required to restore the area overwritten by the graphic with what
     /// was there prior to rendering the graphic.
-    RestoreToPrevious
+    RestoreToPrevious,
+    /// Unknown disposal method.
+    Unknown(u8)
 }
 
 impl DisposalMethod {
@@ -253,6 +255,7 @@ impl DisposalMethod {
             1 => Some(DisposalMethod::DoNotDispose),
             2 => Some(DisposalMethod::RestoreToBackgroundColor),
             3 => Some(DisposalMethod::RestoreToPrevious),
+            n if n < 8 => Some(DisposalMethod::Unknown(n)),
             _ => None
         }
     }

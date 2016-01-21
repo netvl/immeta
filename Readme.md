@@ -26,7 +26,7 @@ Just add a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-immeta = "0.2"
+immeta = "0.3"
 ```
 
 You can see an example on how to use it in `tests/test.rs`.
@@ -34,30 +34,34 @@ You can see an example on how to use it in `tests/test.rs`.
 
 ## Changelog
 
+### Version 0.3.0
+
+* Added unknown disposal method for GIF format. This is a breaking change.
+
 ### Version 0.2.4
 
-* Fixed GIF local color table parsing
+* Fixed GIF local color table parsing.
 
 ### Version 0.2.3
 
-* Bumped byteorder dependency up to 0.4
+* Bumped byteorder dependency up to 0.4.
 
 ### Version 0.2.2
 
-* Added missing `Debug`, `Clone`, `Eq` and `PartialEq` implementations for `GenericMetadata`
+* Added missing `Debug`, `Clone`, `Eq` and `PartialEq` implementations for `GenericMetadata`.
 
 ### Version 0.2.1
 
-* Added `std::error::Error` implementation for `immeta::Error` to facilitate interoperation with other code
+* Added `std::error::Error` implementation for `immeta::Error` to facilitate interoperation with other code.
 
 ### Version 0.2.0
 
-* Added basic support for WEBP format, along with RIFF utils
-* Improved API
+* Added basic support for WEBP format, along with RIFF utils.
+* Improved API.
 
 ### Version 0.1.0
 
-* Initial release, support for GIF, PNG and JPEG
+* Initial release, support for GIF, PNG and JPEG.
 
 ## License
 
