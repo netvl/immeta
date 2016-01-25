@@ -20,6 +20,18 @@ macro_rules! unexpected_eof {
 }
 
 macro_rules! if_eof {
+    (std, $s:expr) => {
+        |e| match e {
+            ref e if e.kind() == ::std::io::ErrorKind::UnexpectedEof => unexpected_eof!($s),
+            e => e.into()
+        }
+    };
+    (std, $fmt:expr, $($args:tt)*) => {
+        |e| match e {
+            ref e if e.kind() == ::std::io::ErrorKind::UnexpectedEof => unexpected_eof!($fmt, $($args)*),
+            e => e.into()
+        }
+    };
     ($s:expr) => {
         |e| match e {
             ::byteorder::Error::UnexpectedEOF => unexpected_eof!($s),

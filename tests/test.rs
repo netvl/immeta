@@ -47,7 +47,6 @@ fn test_png() {
     assert_eq!(md.interlace_method, png::InterlaceMethod::Disabled);
 }
 
-
 #[test]
 fn test_gif_plain() {
     let md = immeta::load_from_file("tests/images/owlet.gif").unwrap();

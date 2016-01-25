@@ -1,6 +1,6 @@
 //! Metadata of GIF images.
 
-use std::io::{BufReader, Read, BufRead};
+use std::io::Read;
 use std::borrow::Cow;
 use std::str;
 
@@ -8,7 +8,7 @@ use byteorder::{ReadBytesExt, LittleEndian};
 
 use types::{Result, Dimensions};
 use traits::LoadableMetadata;
-use utils::{ReadExt, BufReadExt};
+use utils::ReadExt;
 
 /// GIF file version number.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -43,13 +43,13 @@ pub enum Block {
     CommentExtension(CommentExtension)
 }
 
-fn skip_blocks<R: ?Sized + BufRead, F>(r: &mut R, on_eof: F) -> Result<()> 
+fn skip_blocks<R: ?Sized + Read, F>(r: &mut R, on_eof: F) -> Result<()>
     where F: Fn() -> Cow<'static, str>
 {
     loop {
         let n = try_if_eof!(r.read_u8(), on_eof()) as u64;
         if n == 0 { return Ok(()); }
-        if try!(r.skip_exact(n)) != n {
+        if try!(r.skip_exact_0(n)) != n {
             return Err(unexpected_eof!(on_eof()));
         }
     }
@@ -90,7 +90,7 @@ pub struct ImageDescriptor {
 }
 
 impl ImageDescriptor {
-    fn load<R: ?Sized + BufRead>(index: usize, r: &mut R) -> Result<ImageDescriptor> {
+    fn load<R: ?Sized + Read>(index: usize, r: &mut R) -> Result<ImageDescriptor> {
         let left = try_if_eof!(
             r.read_u16::<LittleEndian>(), 
             "when reading left offset of image block {}", index
@@ -122,7 +122,7 @@ impl ImageDescriptor {
 
         if local_color_table {
             let skip_size = local_color_table_size as u64 * 3;
-            if try!(r.skip_exact(skip_size)) != skip_size {
+            if try!(r.skip_exact_0(skip_size)) != skip_size {
                 return Err(unexpected_eof!("when reading color table of image block {}", index));
             }
         }
@@ -187,7 +187,7 @@ impl GraphicControlExtension {
         self.delay_time as u32 * 10
     }
 
-    fn load<R: ?Sized + BufRead>(index: usize, r: &mut R) -> Result<GraphicControlExtension> {
+    fn load<R: ?Sized + Read>(index: usize, r: &mut R) -> Result<GraphicControlExtension> {
         const NAME: &'static str = "graphics control extension block";
 
         let block_size = try_if_eof!(r.read_u8(), "when reading block size of {} {}", NAME, index);
@@ -290,7 +290,7 @@ pub struct PlainTextExtension {
 }
 
 impl PlainTextExtension {
-    fn load<R: ?Sized + BufRead>(index: usize, r: &mut R) -> Result<PlainTextExtension> {
+    fn load<R: ?Sized + Read>(index: usize, r: &mut R) -> Result<PlainTextExtension> {
         const NAME: &'static str = "plain text extension block";
 
         let block_size = try_if_eof!(r.read_u8(), "when reading block size of {} {}", NAME, index);
@@ -381,7 +381,7 @@ impl ApplicationExtension {
         str::from_utf8(&self.authentication_code).ok()
     }
 
-    fn load<R: ?Sized + BufRead>(index: usize, r: &mut R) -> Result<ApplicationExtension> {
+    fn load<R: ?Sized + Read>(index: usize, r: &mut R) -> Result<ApplicationExtension> {
         const NAME: &'static str = "application extension block";
 
         let block_size = try_if_eof!(r.read_u8(), "when reading block size of {} {}", NAME, index);
@@ -390,14 +390,12 @@ impl ApplicationExtension {
         }
 
         let mut application_identifier = [0u8; 8];
-        if try!(r.read_exact_0(&mut application_identifier)) != application_identifier.len() {
-            return Err(unexpected_eof!("while reading application identifier in {} {}", NAME, index));
-        }
+        try!(r.read_exact(&mut application_identifier)
+             .map_err(if_eof!(std, "while reading application identifier in {} {}", NAME, index)));
 
         let mut authentication_code = [0u8; 3];
-        if try!(r.read_exact_0(&mut authentication_code)) != authentication_code.len() {
-            return Err(unexpected_eof!("while reading authentication code in {} {}", NAME, index));
-        }
+        try!(r.read_exact(&mut authentication_code)
+             .map_err(if_eof!(std, "while reading authentication code in {} {}", NAME, index)));
 
         try!(skip_blocks(r, || format!("when reading application data of {} {}", NAME, index).into()));
 
@@ -416,7 +414,7 @@ impl ApplicationExtension {
 pub struct CommentExtension;
 
 impl CommentExtension {
-    fn load<R: ?Sized + BufRead>(index: usize, r: &mut R) -> Result<CommentExtension> {
+    fn load<R: ?Sized + Read>(index: usize, r: &mut R) -> Result<CommentExtension> {
         const NAME: &'static str = "comments extension block";
         try!(skip_blocks(r, || format!("when reading comment data of {} {}", NAME, index).into()));
 
@@ -510,20 +508,16 @@ impl Metadata {
 
 impl LoadableMetadata for Metadata {
     fn load<R: ?Sized + Read>(r: &mut R) -> Result<Metadata> {
-        let mut r = BufReader::new(r);
-
         let mut signature = [0u8; 6];
-        if try!(r.read_exact_0(&mut signature)) != signature.len() {
-            return Err(unexpected_eof!("when reading GIF signature"));
-        }
+        try!(r.read_exact(&mut signature).map_err(if_eof!(std, "when reading GIF signature")));
 
         let version = try!(Version::from_bytes(&signature[3..])
             .ok_or(invalid_format!("invalid GIF version: {:?}", &signature[3..])));
 
-        let width = try!(r.read_u16::<LittleEndian>().map_err(if_eof!("when reading logical width")));
-        let height = try!(r.read_u16::<LittleEndian>().map_err(if_eof!("when reading logical height")));
+        let width = try_if_eof!(r.read_u16::<LittleEndian>(), "when reading logical width");
+        let height = try_if_eof!(r.read_u16::<LittleEndian>(), "when reading logical height");
 
-        let packed_flags = try!(r.read_u8().map_err(if_eof!("when reading global flags")));
+        let packed_flags = try_if_eof!(r.read_u8(), "when reading global flags");
 
         let global_color_table =        (packed_flags & 0b10000000) > 0;
         let color_resolution =          (packed_flags & 0b01110000) >> 4;
@@ -535,12 +529,12 @@ impl LoadableMetadata for Metadata {
         } else {
             0
         };
-        let background_color_index = try!(r.read_u8().map_err(if_eof!("when reading background color index")));
-        let pixel_aspect_ratio = try!(r.read_u8().map_err(if_eof!("when reading pixel aspect ration")));
+        let background_color_index = try_if_eof!(r.read_u8(), "when reading background color index");
+        let pixel_aspect_ratio = try_if_eof!(r.read_u8(), "when reading pixel aspect ration");
 
         if global_color_table {
             let skip_size = global_color_table_size as u64 * 3;
-            if try!(r.skip_exact(skip_size)) != skip_size {
+            if try!(r.skip_exact_0(skip_size)) != skip_size {
                 return Err(unexpected_eof!("when reading global color table"));
             }
         }
@@ -548,16 +542,16 @@ impl LoadableMetadata for Metadata {
         let mut blocks = Vec::new();
         let mut index = 0usize;
         loop {
-            let separator = try!(r.read_u8().map_err(if_eof!("when reading separator of block {}", index)));
+            let separator = try_if_eof!(r.read_u8(), "when reading separator of block {}", index);
             let block = match separator {
-                0x2c => Block::ImageDescriptor(try!(ImageDescriptor::load(index, &mut r))),
+                0x2c => Block::ImageDescriptor(try!(ImageDescriptor::load(index, r))),
                 0x21 => {
-                    let label = try!(r.read_u8().map_err(if_eof!("when reading label of block {}", index)));
+                    let label = try_if_eof!(r.read_u8(), "when reading label of block {}", index);
                     match label {
-                        0x01 => Block::PlainTextExtension(try!(PlainTextExtension::load(index, &mut r))),
-                        0xf9 => Block::GraphicControlExtension(try!(GraphicControlExtension::load(index, &mut r))),
-                        0xfe => Block::CommentExtension(try!(CommentExtension::load(index, &mut r))),
-                        0xff => Block::ApplicationExtension(try!(ApplicationExtension::load(index, &mut r))),
+                        0x01 => Block::PlainTextExtension(try!(PlainTextExtension::load(index, r))),
+                        0xf9 => Block::GraphicControlExtension(try!(GraphicControlExtension::load(index, r))),
+                        0xfe => Block::CommentExtension(try!(CommentExtension::load(index, r))),
+                        0xff => Block::ApplicationExtension(try!(ApplicationExtension::load(index, r))),
                         _ => return Err(invalid_format!("unknown extension type of block {}: 0x{:X}", index, label))
                     }
                 },
