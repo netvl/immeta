@@ -1,4 +1,4 @@
-use std::io::{Read, Cursor, Seek, SeekFrom};
+use std::io::{BufRead, Cursor, Seek, SeekFrom, BufReader};
 use std::fs::File;
 use std::path::Path;
 use std::result;
@@ -37,7 +37,7 @@ use generic::markers::MetadataMarker;
 /// `MetadataMarker::Metadata` associated type always points to concrete metadata type
 /// from one of `immeta::formats` submodule.
 pub mod markers {
-    use std::io::Read;
+    use std::io::{BufRead, Seek};
     use std::path::Path;
     use std::result;
 
@@ -112,13 +112,32 @@ pub mod markers {
         /// # Examples
         ///
         /// ```no_run
-        /// use std::io;
+        /// use std::io::{self, BufReader};
         /// use immeta::markers::{MetadataMarker, Jpeg};
         ///
         /// let data = io::stdin();
-        /// let metadata = Jpeg::load(&mut data.lock());
+        /// let metadata = Jpeg::load(&mut BufReader::new(data.lock()));
         /// ```
-        fn load<R: ?Sized + Read>(r: &mut R) -> Result<Self::Metadata>;
+        fn load<R: ?Sized + BufRead>(r: &mut R) -> Result<Self::Metadata>;
+
+        /// Attempts to load metadata for an image of a concrete type from the provided
+        /// seekable reader.
+        ///
+        /// Invokes `LoadableMetadata::load_from_seek()` for the associated metadata type. Use
+        /// this method instead of calling `load_from_seek()` on the metadata type directly.
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use std::io::{Read, BufReader, Cursor};
+        /// use immeta::markers::{MetadataMarker, Jpeg};
+        ///
+        /// # fn obtain_image() -> Vec<u8> { unimplemented!() }
+        ///
+        /// let data: Vec<u8> = obtain_image();
+        /// let metadata = Jpeg::load(&mut BufReader::new(Cursor::new(data)));
+        /// ```
+        fn load_from_seek<R: ?Sized + BufRead + Seek>(r: &mut R) -> Result<Self::Metadata>;
 
         /// Attempts to load metadata for an image of a concrete type from a file identified
         /// by the provided path.
@@ -176,8 +195,13 @@ pub mod markers {
                 }
 
                 #[inline]
-                fn load<R: ?Sized + Read>(r: &mut R) -> Result<$mtpe> {
+                fn load<R: ?Sized + BufRead>(r: &mut R) -> Result<$mtpe> {
                     $crate::traits::LoadableMetadata::load(r)
+                }
+
+                #[inline]
+                fn load_from_seek<R: ?Sized + BufRead + Seek>(r: &mut R) -> Result<$mtpe> {
+                    $crate::traits::LoadableMetadata::load_from_seek(r)
                 }
 
                 #[inline]
@@ -256,7 +280,7 @@ impl GenericMetadata {
 /// need to read the stream from the beginning several times, a `Seek` bound is necessary
 /// on the input stream. This may cause problems only with network streams as they are
 /// naturally not seekable, so one would need to buffer the data from them first.
-pub fn load<R: ?Sized + Read + Seek>(r: &mut R) -> Result<GenericMetadata> {
+pub fn load<R: ?Sized + BufRead + Seek>(r: &mut R) -> Result<GenericMetadata> {
     // try png
     try!(r.seek(SeekFrom::Start(0)));
     if let Ok(md) = png::Metadata::load(r) {
@@ -290,7 +314,7 @@ pub fn load<R: ?Sized + Read + Seek>(r: &mut R) -> Result<GenericMetadata> {
 /// This method delegates to `load()` method and, consequently, also determines the image format
 /// automatically.
 pub fn load_from_file<P: AsRef<Path>>(p: P) -> Result<GenericMetadata> {
-    let mut f = try!(File::open(p));
+    let mut f = BufReader::new(try!(File::open(p)));
     load(&mut f)
 }
 

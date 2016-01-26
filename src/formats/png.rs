@@ -1,12 +1,11 @@
 //! Metadata for PNG images.
 
-use std::io::Read;
+use std::io::BufRead;
 
 use byteorder::{ReadBytesExt, BigEndian};
 
 use types::{Result, Dimensions};
 use traits::LoadableMetadata;
-use utils::ReadExt;
 
 /// Color type used in an image.
 ///
@@ -142,11 +141,9 @@ pub struct Metadata {
 }
 
 impl LoadableMetadata for Metadata {
-    fn load<R: ?Sized + Read>(r: &mut R) -> Result<Metadata> {
+    fn load<R: ?Sized + BufRead>(r: &mut R) -> Result<Metadata> {
         let mut signature = [0u8; 8];
-        if try!(r.read_exact_0(&mut signature)) != signature.len() {
-            return Err(unexpected_eof!("when reading PNG signature"))
-        };
+        try!(r.read_exact(&mut signature).map_err(if_eof!(std, "when reading PNG signature")));
 
         if &signature != b"\x89PNG\r\n\x1a\n" {
             return Err(invalid_format!("invalid PNG header: {:?}", signature));
@@ -156,9 +153,7 @@ impl LoadableMetadata for Metadata {
         let _ = try!(r.read_u32::<BigEndian>().map_err(if_eof!("when reading chunk length")));
         
         let mut chunk_type = [0u8; 4];
-        if try!(r.read_exact_0(&mut chunk_type)) != chunk_type.len() {
-            return Err(unexpected_eof!("when reading chunk type"));
-        }
+        try!(r.read_exact(&mut chunk_type).map_err(if_eof!(std, "when reading chunk type")));
 
         if &chunk_type != b"IHDR" {
             return Err(invalid_format!("invalid PNG chunk: {:?}", chunk_type));

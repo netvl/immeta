@@ -1,9 +1,8 @@
-use std::io::Read;
+use std::io::BufRead;
 
 use types::{Result, Dimensions};
 use common::riff::{RiffReader, RiffChunk, ChunkId};
 use traits::LoadableMetadata;
-use utils::ReadExt;
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Metadata {
@@ -48,7 +47,7 @@ impl Metadata {
 }
 
 impl LoadableMetadata for Metadata {
-    fn load<R: ?Sized + Read>(r: &mut R) -> Result<Metadata> {
+    fn load<R: ?Sized + BufRead>(r: &mut R) -> Result<Metadata> {
         let mut rr = RiffReader::new(r);
 
         let mut root = try!(rr.root());
@@ -77,9 +76,7 @@ fn read_vp8_chunk(chunk: &mut RiffChunk) -> Result<VP8Metadata> {
     let r = chunk.contents();
 
     let mut hdr = [0u8; 3];
-    if try!(r.read_exact_0(&mut hdr)) != 3 {
-        return Err(unexpected_eof!("when reading VP8 frame header"));
-    }
+    try!(r.read_exact(&mut hdr).map_err(if_eof!(std, "when reading VP8 frame header")));
 
     let mut result = VP8Metadata {
         version_number: 0,
@@ -105,9 +102,7 @@ fn read_vp8_chunk(chunk: &mut RiffChunk) -> Result<VP8Metadata> {
 
     if key_frame {
         let mut hdr = [0u8; 7];
-        if try!(r.read_exact_0(&mut hdr)) != 7 {
-            return Err(unexpected_eof!("when reading VP8 key frame header"));
-        }
+        try!(r.read_exact(&mut hdr).map_err(if_eof!(std, "when reading VP8 key frame header")));
 
         // check magic value
         if &hdr[..3] != &[0x9d, 0x01, 0x2a] {

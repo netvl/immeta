@@ -1,6 +1,6 @@
 //! Metadata of GIF images.
 
-use std::io::Read;
+use std::io::BufRead;
 use std::borrow::Cow;
 use std::str;
 
@@ -8,7 +8,7 @@ use byteorder::{ReadBytesExt, LittleEndian};
 
 use types::{Result, Dimensions};
 use traits::LoadableMetadata;
-use utils::ReadExt;
+use utils::BufReadExt;
 
 /// GIF file version number.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -43,13 +43,13 @@ pub enum Block {
     CommentExtension(CommentExtension)
 }
 
-fn skip_blocks<R: ?Sized + Read, F>(r: &mut R, on_eof: F) -> Result<()>
+fn skip_blocks<R: ?Sized + BufRead, F>(r: &mut R, on_eof: F) -> Result<()>
     where F: Fn() -> Cow<'static, str>
 {
     loop {
         let n = try_if_eof!(r.read_u8(), on_eof()) as u64;
         if n == 0 { return Ok(()); }
-        if try!(r.skip_exact_0(n)) != n {
+        if try!(r.skip_exact(n)) != n {
             return Err(unexpected_eof!(on_eof()));
         }
     }
@@ -90,7 +90,7 @@ pub struct ImageDescriptor {
 }
 
 impl ImageDescriptor {
-    fn load<R: ?Sized + Read>(index: usize, r: &mut R) -> Result<ImageDescriptor> {
+    fn load<R: ?Sized + BufRead>(index: usize, r: &mut R) -> Result<ImageDescriptor> {
         let left = try_if_eof!(
             r.read_u16::<LittleEndian>(), 
             "when reading left offset of image block {}", index
@@ -122,7 +122,7 @@ impl ImageDescriptor {
 
         if local_color_table {
             let skip_size = local_color_table_size as u64 * 3;
-            if try!(r.skip_exact_0(skip_size)) != skip_size {
+            if try!(r.skip_exact(skip_size)) != skip_size {
                 return Err(unexpected_eof!("when reading color table of image block {}", index));
             }
         }
@@ -187,7 +187,7 @@ impl GraphicControlExtension {
         self.delay_time as u32 * 10
     }
 
-    fn load<R: ?Sized + Read>(index: usize, r: &mut R) -> Result<GraphicControlExtension> {
+    fn load<R: ?Sized + BufRead>(index: usize, r: &mut R) -> Result<GraphicControlExtension> {
         const NAME: &'static str = "graphics control extension block";
 
         let block_size = try_if_eof!(r.read_u8(), "when reading block size of {} {}", NAME, index);
@@ -290,7 +290,7 @@ pub struct PlainTextExtension {
 }
 
 impl PlainTextExtension {
-    fn load<R: ?Sized + Read>(index: usize, r: &mut R) -> Result<PlainTextExtension> {
+    fn load<R: ?Sized + BufRead>(index: usize, r: &mut R) -> Result<PlainTextExtension> {
         const NAME: &'static str = "plain text extension block";
 
         let block_size = try_if_eof!(r.read_u8(), "when reading block size of {} {}", NAME, index);
@@ -381,7 +381,7 @@ impl ApplicationExtension {
         str::from_utf8(&self.authentication_code).ok()
     }
 
-    fn load<R: ?Sized + Read>(index: usize, r: &mut R) -> Result<ApplicationExtension> {
+    fn load<R: ?Sized + BufRead>(index: usize, r: &mut R) -> Result<ApplicationExtension> {
         const NAME: &'static str = "application extension block";
 
         let block_size = try_if_eof!(r.read_u8(), "when reading block size of {} {}", NAME, index);
@@ -414,7 +414,7 @@ impl ApplicationExtension {
 pub struct CommentExtension;
 
 impl CommentExtension {
-    fn load<R: ?Sized + Read>(index: usize, r: &mut R) -> Result<CommentExtension> {
+    fn load<R: ?Sized + BufRead>(index: usize, r: &mut R) -> Result<CommentExtension> {
         const NAME: &'static str = "comments extension block";
         try!(skip_blocks(r, || format!("when reading comment data of {} {}", NAME, index).into()));
 
@@ -507,7 +507,7 @@ impl Metadata {
 }
 
 impl LoadableMetadata for Metadata {
-    fn load<R: ?Sized + Read>(r: &mut R) -> Result<Metadata> {
+    fn load<R: ?Sized + BufRead>(r: &mut R) -> Result<Metadata> {
         let mut signature = [0u8; 6];
         try!(r.read_exact(&mut signature).map_err(if_eof!(std, "when reading GIF signature")));
 
@@ -534,7 +534,7 @@ impl LoadableMetadata for Metadata {
 
         if global_color_table {
             let skip_size = global_color_table_size as u64 * 3;
-            if try!(r.skip_exact_0(skip_size)) != skip_size {
+            if try!(r.skip_exact(skip_size)) != skip_size {
                 return Err(unexpected_eof!("when reading global color table"));
             }
         }

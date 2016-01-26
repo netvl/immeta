@@ -1,6 +1,6 @@
 //! Metadata of JPEG images.
 
-use std::io::{BufReader, Read};
+use std::io::BufRead;
 
 use byteorder::{ReadBytesExt, BigEndian};
 
@@ -19,8 +19,7 @@ pub struct Metadata {
 }
 
 impl LoadableMetadata for Metadata {
-    fn load<R: ?Sized + Read>(r: &mut R) -> Result<Metadata> {
-        let mut r = &mut BufReader::new(r);
+    fn load<R: ?Sized + BufRead>(r: &mut R) -> Result<Metadata> {
         loop {
             if try!(r.skip_until(0xff)) == 0 {
                 return Err(unexpected_eof!("when searching for a marker"));
