@@ -64,9 +64,9 @@ impl LoadableMetadata for Metadata {
 
             match chunk.chunk_id() {
                 VP8_CHUNK_ID => return read_vp8_chunk(&mut chunk).map(Metadata::VP8),
-                VP8L_CHUNK_ID => unimplemented!(),
-                VP8X_CHUNK_ID => unimplemented!(),
-                ALPH_CHUNK_ID => unimplemented!(),
+                VP8L_CHUNK_ID => return Err(invalid_format!("unsupported (yet) VP8 chunk id")),
+                VP8X_CHUNK_ID => return Err(invalid_format!("unsupported (yet) VP8 chunk id")),
+                ALPH_CHUNK_ID => return Err(invalid_format!("unsupported (yet) VP8 chunk id")),
                 cid => return Err(invalid_format!("invalid WEBP chunk id: {}", cid))
             }
         }
