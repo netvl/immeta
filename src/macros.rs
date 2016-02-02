@@ -47,6 +47,12 @@ macro_rules! if_eof {
 }
 
 macro_rules! try_if_eof {
+    (std, $e:expr, $s:expr) => {
+        try!($e.map_err(if_eof!(std, $s)))
+    };
+    (std, $e:expr, $fmt:expr, $($args:tt)*) => {
+        try!($e.map_err(if_eof!(std, $fmt, $($args)*)))
+    };
     ($e:expr, $s:expr) => {
         try!($e.map_err(if_eof!($s)))
     };

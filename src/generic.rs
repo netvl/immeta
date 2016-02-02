@@ -116,7 +116,7 @@ pub mod markers {
         /// use immeta::markers::{MetadataMarker, Jpeg};
         ///
         /// let data = io::stdin();
-        /// let metadata = Jpeg::load(&mut BufReader::new(data.lock()));
+        /// let metadata = Jpeg::load(&mut data.lock());
         /// ```
         fn load<R: ?Sized + BufRead>(r: &mut R) -> Result<Self::Metadata>;
 

@@ -1,5 +1,7 @@
 use std::io::{self, Read, BufRead, ErrorKind};
 
+use byteorder::{self, ReadBytesExt, LittleEndian, BigEndian};
+
 pub trait ReadExt: Read {
     fn read_exact_0(&mut self, mut buf: &mut [u8]) -> io::Result<usize> {
         let orig_len = buf.len() as u64;
@@ -69,3 +71,41 @@ pub trait BufReadExt: BufRead {
 }
 
 impl<R: ?Sized + BufRead> BufReadExt for R {}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum ByteOrder {
+    Little,
+    Big,
+}
+
+macro_rules! gen_read_byte_order_ext {
+    (@method $name:ident, $tpe:ty) => {
+    };
+    ($tr:ident, $($name:ident -> $tpe:ty),+) => {
+        pub trait $tr: Read {
+            $(
+            #[inline]
+            fn $name(&mut self, byte_order: ByteOrder) -> byteorder::Result<$tpe> {
+                match byte_order {
+                    ByteOrder::Little => ReadBytesExt::$name::<LittleEndian>(self),
+                    ByteOrder::Big => ReadBytesExt::$name::<BigEndian>(self),
+                }
+            }
+            )+
+        }
+    }
+}
+
+gen_read_byte_order_ext! {
+    ByteOrderReadExt,
+    read_u16 -> u16,
+    read_u32 -> u32,
+    read_u64 -> u64,
+    read_i16 -> i16,
+    read_i32 -> i32,
+    read_i64 -> i64,
+    read_f32 -> f32,
+    read_f64 -> f64
+}
+
+impl<R: Read> ByteOrderReadExt for R {}
