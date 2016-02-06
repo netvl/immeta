@@ -2,8 +2,10 @@ use std::io::{Read, BufRead, Seek, SeekFrom};
 use std::cell::{RefCell, Cell};
 use std::marker::PhantomData;
 
+use byteorder;
+
 use types::Result;
-use utils::{ReadExt, ByteOrder, ByteOrderReadExt};
+use utils::{ByteOrder, ByteOrderReadExt};
 
 pub struct TiffReader<R: BufRead + Seek> {
     source: R
@@ -64,9 +66,8 @@ impl<'a, R: BufRead + Seek + 'a> Iterator for Ifds<'a, R> {
 
     fn next(&mut self) -> Option<Result<Ifd<'a, R>>> {
         match self.read_ifd() {
+            Ok(value) => value.map(Ok),
             Err(e) => Some(Err(e)),
-            Ok(Some(value)) => Some(Ok(value)),
-            Ok(None) => None,
         }
     }
 }
@@ -156,7 +157,7 @@ impl<'a, R: BufRead + Seek + 'a> Ifd<'a, R> {
         );
 
         let offset = try_if_eof!(
-            source.read_u32(self.ifds.byte_order), "when reading TIFF IFD offset value"
+            source.read_u32(self.ifds.byte_order), "when reading TIFF IFD entry data offset"
         );
 
         self.current_entry += 1;
@@ -164,8 +165,8 @@ impl<'a, R: BufRead + Seek + 'a> Ifd<'a, R> {
         Ok(Entry {
             ifds: self.ifds,
             tag: tag,
-            entry_type: EntryType::Byte,
-            count: 0,
+            entry_type: entry_type.into(),
+            count: count,
             offset: offset,
         })
     }
@@ -223,7 +224,7 @@ impl EntryType {
             EntryType::SignedRational => Some(4),
             EntryType::Float          => Some(4),
             EntryType::Double         => Some(8),
-            EntryType::Unknown(n)     => None,
+            EntryType::Unknown(_)     => None,
         }
     }
 }
@@ -255,22 +256,53 @@ impl<'a, R: BufRead + Seek + 'a> Entry<'a, R> {
     #[inline]
     pub fn values<T: EntryTypeRepr>(&self) -> Option<EntryValues<'a, T, R>> {
         if self.entry_type == T::entry_type() {
-            Some(EntryValues {
-                ifds: self.ifds,
-                entry_type: self.entry_type,
-                count: self.count,
-                offset: self.offset,
-                _entry_type_repr: PhantomData,
-            })
+            if let Some(entry_type_size) = T::entry_type().size() {
+                if entry_type_size as u32 * self.count <= 4 {
+                    Some(EntryValues::Embedded(EmbeddedValues {
+                        current: 0,
+                        count: self.count,
+                        data: self.offset,
+                        _entry_type_repr: PhantomData,
+                    }))
+                } else {
+                    Some(EntryValues::Referenced(ReferencedValues {
+                        ifds: self.ifds,
+                        current: 0,
+                        count: self.count,
+                        next_offset: self.offset,
+                        _entry_type_repr: PhantomData,
+                    }))
+                }
+            } else {
+                None
+            }
         } else {
             None
         }
     }
 
     #[inline]
-    pub fn values_vec<T: EntryTypeRepr>(&self) -> Option<Result<Vec<T::Repr>>> {
-        unimplemented!()
+    pub fn all_values<T: EntryTypeRepr>(&self) -> Option<Result<Vec<T::Repr>>> {
+        if self.entry_type == T::entry_type() {
+            let mut result = Vec::new();
+            match T::read_many_from(&mut *self.ifds.source.borrow_mut(), 
+                                    self.ifds.byte_order, self.count, &mut result)
+                .map_err(if_eof!("when reading TIFF IFD entry values")) {
+                Ok(_) => Some(Ok(result)),
+                Err(e) => Some(Err(e))
+            }
+
+        } else {
+            None
+        }
     }
+}
+
+pub trait EntryTypeRepr {
+    type Repr;
+    fn entry_type() -> EntryType;
+    fn read_from<R: Read>(source: &mut R, byte_order: ByteOrder) -> byteorder::Result<(u32, Self::Repr)>;
+    fn read_many_from<R: Read>(source: &mut R, byte_order: ByteOrder, n: u32, target: &mut Vec<Self::Repr>) -> byteorder::Result<()>;
 }
 
 pub mod entry_types {
@@ -280,7 +312,6 @@ pub mod entry_types {
 
     use super::{EntryType, EntryTypeRepr};
     use utils::{ByteOrder, ByteOrderReadExt};
-    use types::Result;
 
     macro_rules! gen_entry_types {
         ($($tpe:ident, $repr:ty, |$source:pat, $byte_order:pat| $read:expr);+) => {
@@ -295,8 +326,16 @@ pub mod entry_types {
                         EntryType::$tpe
                     }
 
-                    fn read_from<R: Read>($source: &mut R, $byte_order: ByteOrder) -> Result<$repr> {
-                        $read.map_err(From::from)
+                    fn read_from<R: Read>($source: &mut R, $byte_order: ByteOrder) -> byteorder::Result<(u32, $repr)> {
+                        $read
+                    }
+
+                    fn read_many_from<R: Read>(source: &mut R, byte_order: ByteOrder, 
+                                               n: u32, target: &mut Vec<Self::Repr>) -> byteorder::Result<()> {
+                        for _ in 0..n {
+                            target.push(try!(Self::read_from(source, byte_order)).1);
+                        }
+                        Ok(())
                     }
                 }
             )+
@@ -304,50 +343,102 @@ pub mod entry_types {
     }
 
     gen_entry_types! {
-        Byte, u8,
-            |source, _| byteorder::ReadBytesExt::read_u8(source);
+        Byte, u8, |source, _| byteorder::ReadBytesExt::read_u8(source).map(|v| (1, v));
         Ascii, String, |source, _| {
             let mut s = String::new();
             loop {
-                let mut b = try!(byteorder::ReadBytesExt::read_u8(source));
+                let b = try!(byteorder::ReadBytesExt::read_u8(source));
                 if b == 0 { break; }
                 s.push(b as char);
             }
-            Ok::<String, byteorder::Error>(s)
+            Ok((s.len() as u32 + 1, s))
         };
-        Short, u16, |source, byte_order| source.read_u16(byte_order);
-        Long, u32, |source, byte_order| source.read_u32(byte_order);
+        Short, u16, |source, byte_order| source.read_u16(byte_order).map(|v| (2, v));
+        Long, u32, |source, byte_order| source.read_u32(byte_order).map(|v| (4, v));
         Rational, (u32, u32), |source, byte_order|
             source.read_u32(byte_order)
-                .and_then(|n| source.read_u32(byte_order).map(|d| (n, d)));
-        SignedByte, i8, |source, _| byteorder::ReadBytesExt::read_i8(source);
-        Undefined, u8, |source, _| byteorder::ReadBytesExt::read_u8(source);
-        SignedShort, i16, |source, byte_order| source.read_i16(byte_order);
-        SignedLong, i32, |source, byte_order| source.read_i32(byte_order);
+                .and_then(|n| source.read_u32(byte_order).map(|d| (n, d)))
+                .map(|v| (4 * 2, v));
+        SignedByte, i8, |source, _| byteorder::ReadBytesExt::read_i8(source).map(|v| (1, v));
+        Undefined, u8, |source, _| byteorder::ReadBytesExt::read_u8(source).map(|v| (1, v));
+        SignedShort, i16, |source, byte_order| source.read_i16(byte_order).map(|v| (2, v));
+        SignedLong, i32, |source, byte_order| source.read_i32(byte_order).map(|v| (4, v));
         SignedRational, (i32, i32), |source, byte_order| 
             source.read_i32(byte_order)
-                .and_then(|n| source.read_i32(byte_order).map(|d| (n, d)));
-        Float, f32, |source, byte_order| source.read_f32(byte_order);
-        Double, f64, |source, byte_order| source.read_f64(byte_order)
+                .and_then(|n| source.read_i32(byte_order).map(|d| (n, d)))
+                .map(|v| (4 * 2, v));
+        Float, f32, |source, byte_order| source.read_f32(byte_order).map(|v| (4, v));
+        Double, f64, |source, byte_order| source.read_f64(byte_order).map(|v| (8, v))
     }
 }
 
-pub trait EntryTypeRepr {
-    type Repr;
-    fn entry_type() -> EntryType;
-    fn read_from<R: Read>(source: &mut R, byte_order: ByteOrder) -> Result<Self::Repr>;
-    fn read_many_from<R: Read>(source: &mut R, byte_order: ByteOrder, n: u32, target: Vec<Self::Repr>) -> Result<()>;
+pub enum EntryValues<'a, T: EntryTypeRepr, R: BufRead + Seek + 'a> {
+    #[doc(hidden)]
+    Embedded(EmbeddedValues<T>),
+    #[doc(hidden)]
+    Referenced(ReferencedValues<'a, T, R>),
 }
 
-pub struct EntryValues<'a, T: EntryTypeRepr, R: BufRead + Seek + 'a> {
-    ifds: &'a LazyIfds<R>,
-    entry_type: EntryType,
+impl<'a, T: EntryTypeRepr, R: BufRead + Seek + 'a> Iterator for EntryValues<'a, T, R> {
+    type Item = Result<T::Repr>;
+
+    fn next(&mut self) -> Option<Result<T::Repr>> {
+        match self.read_value() {
+            Ok(result) => result.map(Ok),
+            Err(e) => Some(Err(e))
+        }
+    }
+}
+
+impl<'a, T: EntryTypeRepr, R: BufRead + Seek + 'a> EntryValues<'a, T, R> {
+    fn read_value(&mut self) -> Result<Option<T::Repr>> {
+        match *self {
+            EntryValues::Embedded(ref mut v) => v.read_value(),
+            EntryValues::Referenced(ref mut v) => v.read_value(),
+        }
+    }
+}
+
+pub struct EmbeddedValues<T: EntryTypeRepr> {
+    current: u32,
     count: u32,
-    offset: u32,
+    data: u32,
     _entry_type_repr: PhantomData<T>,
 }
 
-//impl<'a, R: BufRead + Seek + 'a> Iterator for EntryValues<'a, R> {
-    //type Item = 
-//}
+impl<T: EntryTypeRepr> EmbeddedValues<T> {
+    fn read_value(&mut self) -> Result<Option<T::Repr>> {
+        if self.current >= self.count {
+            Ok(None)
+        } else {
+            unimplemented!()
+        }
+    }
+}
 
+pub struct ReferencedValues<'a, T: EntryTypeRepr, R: BufRead + Seek + 'a> {
+    ifds: &'a LazyIfds<R>,
+    current: u32,
+    count: u32,
+    next_offset: u32,
+    _entry_type_repr: PhantomData<T>,
+}
+
+impl<'a, T: EntryTypeRepr, R: BufRead + Seek + 'a> ReferencedValues<'a, T, R> {
+    fn read_value(&mut self) -> Result<Option<T::Repr>> {
+        if self.current >= self.count {
+            return Ok(None);
+        }
+
+        try!(self.ifds.source.borrow_mut().seek(SeekFrom::Start(self.next_offset as u64)));
+
+        let (bytes_read, value) = try_if_eof!(
+            T::read_from(&mut *self.ifds.source.borrow_mut(), self.ifds.byte_order),
+            "when reading TIFF entry value"
+        );
+        self.next_offset += bytes_read;
+        self.current += 1;
+
+        Ok(Some(value))
+    }
+}
