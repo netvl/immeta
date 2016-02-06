@@ -29,7 +29,7 @@ impl<R: BufRead + Seek> TiffReader<R> {
         };
 
         let magic = try_if_eof!(
-            self.source.read_u16(byte_order), 
+            self.source.read_u16(byte_order),
             "when reading TIFF magic number"
         );
         if magic != 42 {
@@ -37,7 +37,7 @@ impl<R: BufRead + Seek> TiffReader<R> {
         }
 
         Ok(LazyIfds {
-            source: RefCell::new(self.source), 
+            source: RefCell::new(self.source),
             byte_order: byte_order,
             next_ifd_offset: Cell::new(4),
         })
@@ -161,7 +161,7 @@ impl<'a, R: BufRead + Seek + 'a> Ifd<'a, R> {
         );
 
         self.current_entry += 1;
-        
+
         Ok(Entry {
             ifds: self.ifds,
             tag: tag,
@@ -285,7 +285,7 @@ impl<'a, R: BufRead + Seek + 'a> Entry<'a, R> {
     pub fn all_values<T: EntryTypeRepr>(&self) -> Option<Result<Vec<T::Repr>>> {
         if self.entry_type == T::entry_type() {
             let mut result = Vec::new();
-            match T::read_many_from(&mut *self.ifds.source.borrow_mut(), 
+            match T::read_many_from(&mut *self.ifds.source.borrow_mut(),
                                     self.ifds.byte_order, self.count, &mut result)
                 .map_err(if_eof!("when reading TIFF IFD entry values")) {
                 Ok(_) => Some(Ok(result)),
@@ -303,18 +303,28 @@ pub trait EntryTypeRepr {
     fn entry_type() -> EntryType;
     fn read_from<R: Read>(source: &mut R, byte_order: ByteOrder) -> byteorder::Result<(u32, Self::Repr)>;
     fn read_many_from<R: Read>(source: &mut R, byte_order: ByteOrder, n: u32, target: &mut Vec<Self::Repr>) -> byteorder::Result<()>;
+    fn read_from_u32(source: u32, n: u32, count: u32) -> Option<Self::Repr>;
 }
 
 pub mod entry_types {
     use std::io::Read;
+    use std::mem;
+    use std::str;
 
     use byteorder;
+    use arrayvec::ArrayVec;
 
     use super::{EntryType, EntryTypeRepr};
     use utils::{ByteOrder, ByteOrderReadExt};
 
     macro_rules! gen_entry_types {
-        ($($tpe:ident, $repr:ty, |$source:pat, $byte_order:pat| $read:expr);+) => {
+        (
+            $(
+                $tpe:ident, $repr:ty,
+                |$source:pat, $byte_order:pat| $read:expr,
+                |$u32_source:pat, $n:pat, $count:pat| $u32_read:expr
+            );+
+        ) => {
             $(
                 pub enum $tpe {}
 
@@ -330,45 +340,129 @@ pub mod entry_types {
                         $read
                     }
 
-                    fn read_many_from<R: Read>(source: &mut R, byte_order: ByteOrder, 
+                    fn read_many_from<R: Read>(source: &mut R, byte_order: ByteOrder,
                                                n: u32, target: &mut Vec<Self::Repr>) -> byteorder::Result<()> {
                         for _ in 0..n {
                             target.push(try!(Self::read_from(source, byte_order)).1);
                         }
                         Ok(())
                     }
+
+                    fn read_from_u32($u32_source: u32, $n: u32, $count: u32) -> Option<$repr> {
+                        $u32_read
+                    }
                 }
             )+
         }
     }
 
+    // s = zzzzzzzz yyyyyyyy xxxxxxxx wwwwwwww
+    // n =    3         2        1        0
+    #[inline]
+    fn nbyte(s: u32, n: u32) -> u8 {
+        assert!(n <= 3);
+        ((s >> 8 * (3 - n)) & 0xFF) as u8
+    }
+
     gen_entry_types! {
-        Byte, u8, |source, _| byteorder::ReadBytesExt::read_u8(source).map(|v| (1, v));
-        Ascii, String, |source, _| {
-            let mut s = String::new();
-            loop {
-                let b = try!(byteorder::ReadBytesExt::read_u8(source));
-                if b == 0 { break; }
-                s.push(b as char);
-            }
-            Ok((s.len() as u32 + 1, s))
-        };
-        Short, u16, |source, byte_order| source.read_u16(byte_order).map(|v| (2, v));
-        Long, u32, |source, byte_order| source.read_u32(byte_order).map(|v| (4, v));
-        Rational, (u32, u32), |source, byte_order|
-            source.read_u32(byte_order)
+        Byte, u8,
+            |source, _| byteorder::ReadBytesExt::read_u8(source).map(|v| (1, v)),
+            |source, n, count| if n >= count || n >= 4 { None } else { Some(nbyte(source, n)) };
+        Ascii, String,
+            |source, _| {
+                let mut s = String::new();
+                loop {
+                    let b = try!(byteorder::ReadBytesExt::read_u8(source));
+                    if b == 0 { break; }
+                    s.push(b as char);
+                }
+                Ok((s.len() as u32 + 1, s))
+            },
+            |source, n, count| if n >= count || n >= 4 { None } else {
+                // w x y z
+                // +-----0   4
+                // 0 +---0   4
+                // +---0 0   3, 4
+                // 0 +-0 0   3, 4
+                // +-0 +-0   2, 4
+                // +-0 0 0   2, 3, 4
+                // 0 0 +-0   1, 2, 4
+                // 0 0 0 0   1, 2, 3, 4
+                let bs = [nbyte(source, 0), nbyte(source, 1), nbyte(source, 2), nbyte(source, 3)];
+                fn find_substrings<A: Extend<(usize, usize)>>(s: &[u8], target: &mut A) {
+                    let mut p = 0;
+                    let mut i = 0;
+                    while i < s.len() {
+                        if s[i] == 0 {
+                            target.extend(Some((p, i)));  // excluding zero byte
+                            p = i+1;
+                        }
+                        i += 1;
+                    }
+                }
+                let mut substrings = ArrayVec::<[_; 4]>::new();
+                find_substrings(&bs[..count as usize], &mut substrings);
+                substrings.get(n as usize)
+                    .map(|&(s, e)| unsafe { str::from_utf8_unchecked(&bs[s..e]).to_owned() })
+            };
+        Short, u16,
+            |source, byte_order| source.read_u16(byte_order).map(|v| (2, v)),
+            |source, n, count| if n >= count || n >= 2 { None } else {
+                Some(
+                    ((nbyte(source, 2*n + 1) as u16) << 8) |
+                    (nbyte(source, 2*n) as u16)
+                )
+            };
+        Long, u32,
+            |source, byte_order| source.read_u32(byte_order).map(|v| (4, v)),
+            |source, n, _| if n != 1 { None } else {
+                Some(
+                    ((nbyte(source, 3) as u32) << 24) |
+                    ((nbyte(source, 2) as u32) << 16) |
+                    ((nbyte(source, 1) as u32) << 8) |
+                    (nbyte(source, 0) as u32)
+                )
+            };
+        Rational, (u32, u32),
+            |source, byte_order| source.read_u32(byte_order)
                 .and_then(|n| source.read_u32(byte_order).map(|d| (n, d)))
-                .map(|v| (4 * 2, v));
-        SignedByte, i8, |source, _| byteorder::ReadBytesExt::read_i8(source).map(|v| (1, v));
-        Undefined, u8, |source, _| byteorder::ReadBytesExt::read_u8(source).map(|v| (1, v));
-        SignedShort, i16, |source, byte_order| source.read_i16(byte_order).map(|v| (2, v));
-        SignedLong, i32, |source, byte_order| source.read_i32(byte_order).map(|v| (4, v));
-        SignedRational, (i32, i32), |source, byte_order| 
-            source.read_i32(byte_order)
+                .map(|v| (4 * 2, v)),
+            |_, _, _| None;
+        SignedByte, i8,
+            |source, _| byteorder::ReadBytesExt::read_i8(source).map(|v| (1, v)),
+            |source, n, count| if n >= count || n >= 4 { None } else { Some(nbyte(source, n) as i8) };
+        Undefined, u8,
+            |source, _| byteorder::ReadBytesExt::read_u8(source).map(|v| (1, v)),
+            |source, n, count| if n >= count || n >= 4 { None } else { Some(nbyte(source, n)) };
+        SignedShort, i16,
+            |source, byte_order| source.read_i16(byte_order).map(|v| (2, v)),
+            |source, n, count| if n >= count || n >= 2 { None } else {
+                Some(
+                    ((nbyte(source, 2*n + 1) as i16) << 8) |
+                    (nbyte(source, 2*n) as i16)
+                )
+            };
+        SignedLong, i32,
+            |source, byte_order| source.read_i32(byte_order).map(|v| (4, v)),
+            |source, n, _| if n >= 1 { None } else {
+                Some(
+                    ((nbyte(source, 3) as i32) << 24) |
+                    ((nbyte(source, 2) as i32) << 16) |
+                    ((nbyte(source, 1) as i32) << 8) |
+                    (nbyte(source, 0) as i32)
+                )
+            };
+        SignedRational, (i32, i32),
+            |source, byte_order| source.read_i32(byte_order)
                 .and_then(|n| source.read_i32(byte_order).map(|d| (n, d)))
-                .map(|v| (4 * 2, v));
-        Float, f32, |source, byte_order| source.read_f32(byte_order).map(|v| (4, v));
-        Double, f64, |source, byte_order| source.read_f64(byte_order).map(|v| (8, v))
+                .map(|v| (4 * 2, v)),
+            |_, _, _| None;
+        Float, f32,
+            |source, byte_order| source.read_f32(byte_order).map(|v| (4, v)),
+            |source, n, _| if n >= 1 { None } else { Some(unsafe { mem::transmute(source) }) };
+        Double, f64,
+            |source, byte_order| source.read_f64(byte_order).map(|v| (8, v)),
+            |_, _, _| None
     }
 }
 
@@ -393,7 +487,7 @@ impl<'a, T: EntryTypeRepr, R: BufRead + Seek + 'a> Iterator for EntryValues<'a, 
 impl<'a, T: EntryTypeRepr, R: BufRead + Seek + 'a> EntryValues<'a, T, R> {
     fn read_value(&mut self) -> Result<Option<T::Repr>> {
         match *self {
-            EntryValues::Embedded(ref mut v) => v.read_value(),
+            EntryValues::Embedded(ref mut v) => Ok(v.read_value()),
             EntryValues::Referenced(ref mut v) => v.read_value(),
         }
     }
@@ -407,11 +501,13 @@ pub struct EmbeddedValues<T: EntryTypeRepr> {
 }
 
 impl<T: EntryTypeRepr> EmbeddedValues<T> {
-    fn read_value(&mut self) -> Result<Option<T::Repr>> {
+    fn read_value(&mut self) -> Option<T::Repr> {
         if self.current >= self.count {
-            Ok(None)
+            None
         } else {
-            unimplemented!()
+            let result = T::read_from_u32(self.data, self.current, self.count);
+            self.current += 1;
+            result
         }
     }
 }

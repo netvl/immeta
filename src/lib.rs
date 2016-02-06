@@ -33,6 +33,7 @@
 
 extern crate byteorder;
 extern crate num;
+extern crate arrayvec;
 
 pub use types::*;
 pub use traits::*;

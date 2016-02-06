@@ -12,3 +12,4 @@ keywords = ["image", "metadata"]
 [dependencies]
 byteorder = "0.4"
 num = { version = "0.1", default-features = false }  # we don't need bigint and others here
+arrayvec = "0.3"
