@@ -284,12 +284,22 @@ impl<'a, R: BufRead + Seek + 'a> Entry<'a, R> {
     #[inline]
     pub fn all_values<T: EntryTypeRepr>(&self) -> Option<Result<Vec<T::Repr>>> {
         if self.entry_type == T::entry_type() {
-            let mut result = Vec::new();
-            match T::read_many_from(&mut *self.ifds.source.borrow_mut(),
-                                    self.ifds.byte_order, self.count, &mut result)
-                .map_err(if_eof!("when reading TIFF IFD entry values")) {
-                Ok(_) => Some(Ok(result)),
-                Err(e) => Some(Err(e))
+            if let Some(entry_type_size) = T::entry_type().size() {
+                if entry_type_size as u32 * self.count <= 4 {
+                    Some(self.values::<T>().unwrap().collect())
+                } else {
+                    // FIXME: seek to self.offset
+                    let mut result = Vec::new();
+                    match T::read_many_from(&mut *self.ifds.source.borrow_mut(),
+                                            self.ifds.byte_order, self.count, &mut result)
+                        .map_err(if_eof!("when reading TIFF IFD entry values")) {
+                        Ok(_) => Some(Ok(result)),
+                        Err(e) => Some(Err(e))
+                    }
+                }
+
+            } else {
+                None
             }
 
         } else {
