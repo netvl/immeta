@@ -1,4 +1,4 @@
-use std::io::{Read, BufRead, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom};
 use std::cell::{RefCell, Cell};
 use std::marker::PhantomData;
 
@@ -7,17 +7,38 @@ use byteorder;
 use types::Result;
 use utils::{ByteOrder, ByteOrderReadExt};
 
-pub struct TiffReader<R: BufRead + Seek> {
+/// A TIFF document reader.
+///
+/// This structure wraps a `Read` and `Seek` implementation and allows one to read a TIFF
+/// document from it.
+pub struct TiffReader<R: Read + Seek> {
     source: R
 }
 
-impl<R: BufRead + Seek> TiffReader<R> {
+impl<R: Read + Seek> TiffReader<R> {
+    /// Wraps the provider `Read + Seek` implementation and returns a new TIFF reader.
     pub fn new(source: R) -> TiffReader<R> {
         TiffReader {
             source: source
         }
     }
 
+    /// Returns an iterator over IFDs in the TIFF document.
+    ///
+    /// This method first checks that the underlying data stream is indeed a valid TIFF document,
+    /// and only then returns the iterator.
+    ///
+    /// Note that the returned value does not implement `IntoIterator`, but an immutable
+    /// reference to it does. Therefore, it should be used like this:
+    ///
+    /// ```no_run
+    /// # use std::io::Cursor;
+    /// # use immeta::common::tiff::TiffReader;
+    /// # let r = TiffReader::new(Cursor::new(Vec::<u8>::new()));
+    /// for ifd in &r.ifds().unwrap() {
+    ///     // ...
+    /// }
+    /// ```
     pub fn ifds(mut self) -> Result<LazyIfds<R>> {
         let mut bom = [0u8; 2];
         try_if_eof!(std, self.source.read_exact(&mut bom), "while reading byte order mark");
@@ -44,13 +65,15 @@ impl<R: BufRead + Seek> TiffReader<R> {
     }
 }
 
-pub struct LazyIfds<R: BufRead + Seek> {
+/// An intermediate structure, a reference to which can be converted to an iterator
+/// of IFDs.
+pub struct LazyIfds<R: Read + Seek> {
     source: RefCell<R>,
     byte_order: ByteOrder,
     next_ifd_offset: Cell<u64>,
 }
 
-impl<'a, R: BufRead + Seek> IntoIterator for &'a LazyIfds<R> {
+impl<'a, R: Read + Seek> IntoIterator for &'a LazyIfds<R> {
     type Item = Result<Ifd<'a, R>>;
     type IntoIter = Ifds<'a, R>;
 
@@ -59,9 +82,10 @@ impl<'a, R: BufRead + Seek> IntoIterator for &'a LazyIfds<R> {
     }
 }
 
-pub struct Ifds<'a, R: BufRead + Seek + 'a>(&'a LazyIfds<R>);
+/// An iterator of IFDs in a TIFF document.
+pub struct Ifds<'a, R: Read + Seek + 'a>(&'a LazyIfds<R>);
 
-impl<'a, R: BufRead + Seek + 'a> Iterator for Ifds<'a, R> {
+impl<'a, R: Read + Seek + 'a> Iterator for Ifds<'a, R> {
     type Item = Result<Ifd<'a, R>>;
 
     fn next(&mut self) -> Option<Result<Ifd<'a, R>>> {
@@ -72,7 +96,7 @@ impl<'a, R: BufRead + Seek + 'a> Iterator for Ifds<'a, R> {
     }
 }
 
-impl<'a, R: BufRead + Seek> Ifds<'a, R> {
+impl<'a, R: Read + Seek> Ifds<'a, R> {
     fn read_ifd(&mut self) -> Result<Option<Ifd<'a, R>>> {
         let next_ifd_offset = self.0.next_ifd_offset.get();
 
@@ -89,16 +113,16 @@ impl<'a, R: BufRead + Seek> Ifds<'a, R> {
         let current_ifd_offset = next_ifd_offset;
 
         // read the length of this IFD
-        let next_ifd_size = try_if_eof!(
+        let current_ifd_size = try_if_eof!(
             self.0.source.borrow_mut().read_u16(self.0.byte_order), "when reading number of entries in an IFD"
         );
         // it is an error for an IFD to be empty
-        if next_ifd_size == 0 {
+        if current_ifd_size == 0 {
             return Err(invalid_format!("number of entries in an IFD is zero"));
         }
 
         // compute the offset of the next IFD offset and seek to it
-        let next_ifd_offset_offset = current_ifd_offset + 2 + next_ifd_size as u64 * 12;
+        let next_ifd_offset_offset = current_ifd_offset + 2 + current_ifd_size as u64 * 12;
         try_if_eof!(std,
             self.0.source.borrow_mut().seek(SeekFrom::Start(next_ifd_offset_offset as u64)),
             "when seeking to the next IFD offset"
@@ -113,19 +137,22 @@ impl<'a, R: BufRead + Seek> Ifds<'a, R> {
             ifds: self.0,
             ifd_offset: current_ifd_offset,
             current_entry: 0,
-            total_entries: next_ifd_size,
+            total_entries: current_ifd_size,
         }))
     }
 }
 
-pub struct Ifd<'a, R: BufRead + Seek + 'a> {
+/// Represents a single IFD.
+///
+/// A TIFF IFD consists of entries, so this structure is an iterator yielding IFD entries.
+pub struct Ifd<'a, R: Read + Seek + 'a> {
     ifds: &'a LazyIfds<R>,
     ifd_offset: u64,
     current_entry: u16,
     total_entries: u16,
 }
 
-impl<'a, R: BufRead + Seek + 'a> Iterator for Ifd<'a, R> {
+impl<'a, R: Read + Seek + 'a> Iterator for Ifd<'a, R> {
     type Item = Result<Entry<'a, R>>;
 
     fn next(&mut self) -> Option<Result<Entry<'a, R>>> {
@@ -137,25 +164,29 @@ impl<'a, R: BufRead + Seek + 'a> Iterator for Ifd<'a, R> {
     }
 }
 
-impl<'a, R: BufRead + Seek + 'a> Ifd<'a, R> {
+impl<'a, R: Read + Seek + 'a> Ifd<'a, R> {
     fn read_entry(&mut self) -> Result<Entry<'a, R>> {
         let mut source = self.ifds.source.borrow_mut();
 
         // seek to the beginning of the next entry (ifd offset + 2 + next_entry * 12)
         try!(source.seek(SeekFrom::Start(self.ifd_offset + 2 + self.current_entry as u64 * 12)));
 
+        // read the tag
         let tag = try_if_eof!(
             source.read_u16(self.ifds.byte_order), "when reading TIFF IFD entry tag"
         );
 
+        // read the entry type
         let entry_type = try_if_eof!(
             source.read_u16(self.ifds.byte_order), "when reading TIFF IFD entry type"
         );
 
+        // read the count
         let count = try_if_eof!(
             source.read_u32(self.ifds.byte_order), "when reading TIFF IFD entry data count"
         );
 
+        // read the offset/value
         let offset = try_if_eof!(
             source.read_u32(self.ifds.byte_order), "when reading TIFF IFD entry data offset"
         );
@@ -172,6 +203,7 @@ impl<'a, R: BufRead + Seek + 'a> Ifd<'a, R> {
     }
 }
 
+/// Designates TIFF IFD entry type, as defined by TIFF spec.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum EntryType {
     Byte,
@@ -210,7 +242,7 @@ impl From<u16> for EntryType {
 }
 
 impl EntryType {
-    pub fn size(self) -> Option<u8> {
+    fn size(self) -> Option<u8> {
         match self {
             EntryType::Byte           => Some(1),
             EntryType::Ascii          => Some(1),
@@ -229,7 +261,8 @@ impl EntryType {
     }
 }
 
-pub struct Entry<'a, R: BufRead + Seek + 'a> {
+/// Represents a single TIFF IFD entry.
+pub struct Entry<'a, R: Read + Seek + 'a> {
     ifds: &'a LazyIfds<R>,
     tag: u16,
     entry_type: EntryType,
@@ -237,26 +270,38 @@ pub struct Entry<'a, R: BufRead + Seek + 'a> {
     offset: u32,
 }
 
-impl<'a, R: BufRead + Seek + 'a> Entry<'a, R> {
+impl<'a, R: Read + Seek + 'a> Entry<'a, R> {
+    /// Returns the tag of the entry.
     #[inline]
     pub fn tag(&self) -> u16 {
         self.tag
     }
 
+    /// Returns entry type.
     #[inline]
     pub fn entry_type(&self) -> EntryType {
         self.entry_type
     }
 
+    /// Returns the number of items this entry contains.
     #[inline]
     pub fn count(&self) -> u32 {
         self.count
     }
 
+    /// Returns an iterator for elements of the specified representation type.
+    ///
+    /// This method returns `None` if the requested representation type does not correspond
+    /// to the actual type of the entry. Also it returns `None` if the entry type is
+    /// unknown.
     #[inline]
     pub fn values<T: EntryTypeRepr>(&self) -> Option<EntryValues<'a, T, R>> {
+        // compare the requested repr type with the actual entry type
         if self.entry_type == T::entry_type() {
+            // then try to get the size and ignore the data in the entry if it is unknown
             if let Some(entry_type_size) = T::entry_type().size() {
+                // if the total entry data size is smaller than 4 bytes (u32 value length)
+                // the the data is embedded into the offset u32
                 if entry_type_size as u32 * self.count <= 4 {
                     Some(EntryValues::Embedded(EmbeddedValues {
                         current: 0,
@@ -264,6 +309,7 @@ impl<'a, R: BufRead + Seek + 'a> Entry<'a, R> {
                         data: self.offset,
                         _entry_type_repr: PhantomData,
                     }))
+                // othewise the data is stored at that offset
                 } else {
                     Some(EntryValues::Referenced(ReferencedValues {
                         ifds: self.ifds,
@@ -281,18 +327,37 @@ impl<'a, R: BufRead + Seek + 'a> Entry<'a, R> {
         }
     }
 
+    /// Returns a vector containing all of the items of this entry, loaded with the specified
+    /// representation type.
+    ///
+    /// This method returns `None` if the requested representation type does not correspond
+    /// to the actual type of the entry. Also it returns `None` if the entry type is
+    /// unknown.
     #[inline]
     pub fn all_values<T: EntryTypeRepr>(&self) -> Option<Result<Vec<T::Repr>>> {
+        // compare the requested repr type with the actual entry type
         if self.entry_type == T::entry_type() {
+            // then try to get the size and ignore the data in the entry if it is unknown
             if let Some(entry_type_size) = T::entry_type().size() {
+                // if the total entry data size is smaller than 4 bytes (u32 value length)
+                // the the data is embedded into the offset u32, and we just delegate to the
+                // iterator
                 if entry_type_size as u32 * self.count <= 4 {
                     Some(self.values::<T>().unwrap().collect())
+                // othewise the data is stored at that offset, load it all at once
                 } else {
-                    // FIXME: seek to self.offset
+                    match self.ifds.source.borrow_mut().seek(SeekFrom::Start(self.offset as u64))
+                        .map_err(if_eof!(std, "when seeking to the beginning of IFD entry data"))
+                    {
+                        Ok(_) => {}
+                        Err(e) => return Some(Err(e))
+                    }
+
                     let mut result = Vec::new();
                     match T::read_many_from(&mut *self.ifds.source.borrow_mut(),
                                             self.ifds.byte_order, self.count, &mut result)
-                        .map_err(if_eof!("when reading TIFF IFD entry values")) {
+                        .map_err(if_eof!("when reading TIFF IFD entry values"))
+                    {
                         Ok(_) => Some(Ok(result)),
                         Err(e) => Some(Err(e))
                     }
@@ -308,14 +373,34 @@ impl<'a, R: BufRead + Seek + 'a> Entry<'a, R> {
     }
 }
 
+/// Designates a marker type which represent one of TIFF directory entry types.
 pub trait EntryTypeRepr {
+    /// The represented type, e.g. Rust primitive or a string.
     type Repr;
+
+    /// Returns the entry type corresponding to this marker type.
     fn entry_type() -> EntryType;
+
+    /// Attempts to read the represented value from the given stream with the given byte order.
+    ///
+    /// Returns the number of bytes read and the value itself.
     fn read_from<R: Read>(source: &mut R, byte_order: ByteOrder) -> byteorder::Result<(u32, Self::Repr)>;
+
+    /// Attempts to read a number of the represented values from the given stream with the given
+    /// byte order.
+    ///
+    /// `n` values will be are stored in `target`, or an error will be returned. `target` vector
+    /// may be modified even if this method returns an error.
     fn read_many_from<R: Read>(source: &mut R, byte_order: ByteOrder, n: u32, target: &mut Vec<Self::Repr>) -> byteorder::Result<()>;
+
+    /// Reads the `n`th represented value inside `source`.
+    ///
+    /// If the value can be read successfully (`n` < `count`, the represented type is smaller
+    /// than or equal to u32, etc.), returns `Some(value)`, otherwise returns `None`.
     fn read_from_u32(source: u32, n: u32, count: u32) -> Option<Self::Repr>;
 }
 
+/// Contains representation types for all of defined TIFF entry types.
 pub mod entry_types {
     use std::io::Read;
     use std::mem;
@@ -476,14 +561,15 @@ pub mod entry_types {
     }
 }
 
-pub enum EntryValues<'a, T: EntryTypeRepr, R: BufRead + Seek + 'a> {
+/// An iterator over values in an TIFF IFD entry.
+pub enum EntryValues<'a, T: EntryTypeRepr, R: Read + Seek + 'a> {
     #[doc(hidden)]
     Embedded(EmbeddedValues<T>),
     #[doc(hidden)]
     Referenced(ReferencedValues<'a, T, R>),
 }
 
-impl<'a, T: EntryTypeRepr, R: BufRead + Seek + 'a> Iterator for EntryValues<'a, T, R> {
+impl<'a, T: EntryTypeRepr, R: Read + Seek + 'a> Iterator for EntryValues<'a, T, R> {
     type Item = Result<T::Repr>;
 
     fn next(&mut self) -> Option<Result<T::Repr>> {
@@ -494,7 +580,7 @@ impl<'a, T: EntryTypeRepr, R: BufRead + Seek + 'a> Iterator for EntryValues<'a, 
     }
 }
 
-impl<'a, T: EntryTypeRepr, R: BufRead + Seek + 'a> EntryValues<'a, T, R> {
+impl<'a, T: EntryTypeRepr, R: Read + Seek + 'a> EntryValues<'a, T, R> {
     fn read_value(&mut self) -> Result<Option<T::Repr>> {
         match *self {
             EntryValues::Embedded(ref mut v) => Ok(v.read_value()),
@@ -503,6 +589,7 @@ impl<'a, T: EntryTypeRepr, R: BufRead + Seek + 'a> EntryValues<'a, T, R> {
     }
 }
 
+#[doc(hidden)]
 pub struct EmbeddedValues<T: EntryTypeRepr> {
     current: u32,
     count: u32,
@@ -522,7 +609,8 @@ impl<T: EntryTypeRepr> EmbeddedValues<T> {
     }
 }
 
-pub struct ReferencedValues<'a, T: EntryTypeRepr, R: BufRead + Seek + 'a> {
+#[doc(hidden)]
+pub struct ReferencedValues<'a, T: EntryTypeRepr, R: Read + Seek + 'a> {
     ifds: &'a LazyIfds<R>,
     current: u32,
     count: u32,
@@ -530,7 +618,7 @@ pub struct ReferencedValues<'a, T: EntryTypeRepr, R: BufRead + Seek + 'a> {
     _entry_type_repr: PhantomData<T>,
 }
 
-impl<'a, T: EntryTypeRepr, R: BufRead + Seek + 'a> ReferencedValues<'a, T, R> {
+impl<'a, T: EntryTypeRepr, R: Read + Seek + 'a> ReferencedValues<'a, T, R> {
     fn read_value(&mut self) -> Result<Option<T::Repr>> {
         if self.current >= self.count {
             return Ok(None);

@@ -79,8 +79,6 @@ pub enum ByteOrder {
 }
 
 macro_rules! gen_read_byte_order_ext {
-    (@method $name:ident, $tpe:ty) => {
-    };
     ($tr:ident, $($name:ident -> $tpe:ty),+) => {
         pub trait $tr: Read {
             $(
