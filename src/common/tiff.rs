@@ -57,10 +57,15 @@ impl<R: Read + Seek> TiffReader<R> {
             return Err(invalid_format!("invalid TIFF magic number: {}", magic));
         }
 
+        let next_ifd_offset = try_if_eof!(
+            self.source.read_u32(byte_order),
+            "when reading first TIFF IFD offset"
+        );
+
         Ok(LazyIfds {
             source: RefCell::new(self.source),
             byte_order: byte_order,
-            next_ifd_offset: Cell::new(4),
+            next_ifd_offset: Cell::new(next_ifd_offset as u64),
         })
     }
 }
@@ -130,7 +135,7 @@ impl<'a, R: Read + Seek> Ifds<'a, R> {
 
         // read and update the next IFD offset for further calls to `next()`
         self.0.next_ifd_offset.set(try_if_eof!(
-            self.0.source.borrow_mut().read_u16(self.0.byte_order), "when reading the next IFD offset"
+            self.0.source.borrow_mut().read_u32(self.0.byte_order), "when reading the next IFD offset"
         ) as u64);
 
         Ok(Some(Ifd {
@@ -165,6 +170,11 @@ impl<'a, R: Read + Seek + 'a> Iterator for Ifd<'a, R> {
 }
 
 impl<'a, R: Read + Seek + 'a> Ifd<'a, R> {
+    #[inline]
+    fn len(&self) -> u16 {
+        self.total_entries
+    }
+
     fn read_entry(&mut self) -> Result<Entry<'a, R>> {
         let mut source = self.ifds.source.borrow_mut();
 
@@ -635,4 +645,206 @@ impl<'a, T: EntryTypeRepr, R: Read + Seek + 'a> ReferencedValues<'a, T, R> {
 
         Ok(Some(value))
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::{Write, Cursor};
+
+    use byteorder::{self, ByteOrder, BigEndian, LittleEndian};
+
+    use super::{TiffReader, EntryType, entry_types};
+
+    trait Writable {
+        fn write_to<W: Write + ?Sized, T: ByteOrder>(&self, target: &mut W);
+    }
+
+    impl Writable for [u8] {
+        fn write_to<W: Write + ?Sized, T: ByteOrder>(&self, target: &mut W) {
+            target.write_all(self).unwrap();
+        }
+    }
+
+    impl Writable for i8 {
+        fn write_to<W: Write + ?Sized, T: ByteOrder>(&self, target: &mut W) {
+            byteorder::WriteBytesExt::write_i8(target, *self).unwrap();
+        }
+    }
+
+    impl Writable for u8 {
+        fn write_to<W: Write + ?Sized, T: ByteOrder>(&self, target: &mut W) {
+            byteorder::WriteBytesExt::write_u8(target, *self).unwrap();
+        }
+    }
+
+    macro_rules! gen_writable {
+        ($($t:ty, $f:ident);+) => {
+            $(
+                impl Writable for $t {
+                    fn write_to<W: Write + ?Sized, T: ByteOrder>(&self, target: &mut W) {
+                        byteorder::WriteBytesExt::$f::<T>(target, *self).unwrap();
+                    }
+                }
+            )+
+        }
+    }
+
+    gen_writable! {
+        i16, write_i16;
+        u16, write_u16;
+        i32, write_i32;
+        u32, write_u32;
+        i64, write_i64;
+        u64, write_u64;
+        f32, write_f32;
+        f64, write_f64
+    }
+
+    macro_rules! build {
+        ($e:ty, $($arg:expr),+) => {{
+            let mut data = Vec::new();
+            $($arg.write_to::<_, $e>(&mut data);)+
+            data
+        }}
+    }
+
+    #[test]
+    fn test_big_endian_empty() {
+        let data = build! { BigEndian,
+            b"MM", 42u16, 0u32
+        };
+
+        let reader = TiffReader::new(Cursor::new(data));
+        let ifds = reader.ifds().unwrap();
+        let mut ifds_iter = (&ifds).into_iter();
+        assert!(ifds_iter.next().is_none());
+    }
+
+    #[test]
+    fn test_little_endian_empty() {
+        let data = build! { LittleEndian,
+            b"II", 42u16, 0u32
+        };
+
+        let reader = TiffReader::new(Cursor::new(data));
+        let ifds = reader.ifds().unwrap();
+        let mut ifds_iter = (&ifds).into_iter();
+        assert!(ifds_iter.next().is_none());
+    }
+
+    #[test]
+    fn test_one_ifd() {
+        let data = build! { BigEndian,
+            b"MM", 42u16, 8u32,  // 1st IFD starts from 8th offset
+            
+            // first IFD
+            13u16,
+
+            // first entry, Byte
+            4u16, 1u16, 4u32, b"abcd",
+
+            // second entry, Ascii
+            8u16, 2u16, 12u32, 170u32,
+
+            // third entry, Short
+            15u16, 3u16, 2u32, 23u16, 34u16,
+
+            // fourth entry, Long
+            16u16, 4u16, 3u32, 182u32,
+
+            // fifth entry, Rational
+            23u16, 5u16, 2u32, 194u32,
+
+            // sixth entry, SignedByte
+            42u16, 6u16, 8u32, 210u32,
+
+            // seventh entry, Undefined
+            4u16, 7u16, 20u32, 218u32,
+
+            // eighth entry, SignedShort
+            8u16, 8u16, 3u32, 238u32,
+
+            // ninth entry, SignedLong
+            15u16, 9u16, 1u32, -3724i32,
+
+            // tenth entry, SignedRational
+            16u16, 10u16, 1u32, 244u32,
+
+            // eleventh entry, Float
+            23u16, 11u16, 1u32, 0.123f32,
+
+            // twelvth entry, Double
+            42u16, 12u16, 1u32, 252u32,
+
+            // thirteenth entry, Unknown
+            4u16, 123u16, 0u32, 0u32,
+
+            // next IFD offset¸ zero means no more IFDs
+            0u32,
+
+            // @170, Ascii, 12 bytes, zero-terminated
+            b"hello\x00world\x00",
+
+            // @182, Long x3, 12 bytes,
+            123u32, 12u32, 5492957u32,
+
+            // @194, Rational x2, 16 bytes
+            22u32, 7u32, 355u32, 113u32,
+
+            // @210, SignedByte x8, 8 bytes
+            -3i8, -2i8, -1i8, 0i8, 1i8, 2i8, 3i8, 4i8,
+
+            // @218, Undefined x20, 20 bytes
+            "привет мир!".as_bytes(),
+
+            // @238, SignedShort x3, 6 bytes
+            -8i16, 0i16, 128i16,
+
+            // @244, SignedRational x1, 8 bytes
+            -333i32, -106i32,
+
+            // @252, Double x1, 8 bytes
+            3.14f64
+        };
+
+        let reader = TiffReader::new(Cursor::new(data));
+        
+        for ifd in &reader.ifds().unwrap() {
+            let ifd = ifd.unwrap();
+
+            assert_eq!(ifd.len(), 13);
+            for (i, e) in ifd.enumerate() {
+                let e = e.unwrap();
+
+                match i {
+                    0 => {
+                        assert_eq!(e.tag(), 4);
+                        assert_eq!(e.entry_type(), EntryType::Byte);
+                        assert_eq!(e.count(), 4);
+                        assert_eq!(
+                            e.all_values::<entry_types::Byte>().unwrap().unwrap(), 
+                            b"abcd".to_owned()
+                        );
+                    }
+                    1 => {
+                        assert_eq!(e.tag(), 8);
+                        assert_eq!(e.entry_type(), EntryType::Ascii);
+                        assert_eq!(e.count(), 12);
+                        assert_eq!(
+                            e.all_values::<entry_types::Ascii>().unwrap().unwrap(), 
+                            vec!["hello", "world"]
+                        );
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    // one IFD
+    // two IFDs
+    // first - third - second IFDs
+    // reading IFD entries
+    //   all types
+    //   all embeddable types
 }
