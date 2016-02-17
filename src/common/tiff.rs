@@ -333,9 +333,9 @@ impl<'a, R: Read + Seek + 'a> Entry<'a, R> {
                 } else {
                     Some(EntryValues::Referenced(ReferencedValues {
                         ifds: self.ifds,
-                        current: 0,
                         count: self.count,
                         next_offset: self.offset,
+                        bytes_read: 0,
                         _entry_type_repr: PhantomData,
                     }))
                 }
@@ -423,7 +423,6 @@ pub trait EntryTypeRepr {
 /// Contains representation types for all of defined TIFF entry types.
 pub mod entry_types {
     use std::io::Read;
-    use std::mem;
     use std::str;
 
     use byteorder;
@@ -613,15 +612,15 @@ impl<T: EntryTypeRepr> EmbeddedValues<T> {
 #[doc(hidden)]
 pub struct ReferencedValues<'a, T: EntryTypeRepr, R: Read + Seek + 'a> {
     ifds: &'a LazyIfds<R>,
-    current: u32,
     count: u32,
+    bytes_read: u32,
     next_offset: u32,
     _entry_type_repr: PhantomData<T>,
 }
 
 impl<'a, T: EntryTypeRepr, R: Read + Seek + 'a> ReferencedValues<'a, T, R> {
     fn read_value(&mut self) -> Result<Option<T::Repr>> {
-        if self.current >= self.count {
+        if self.bytes_read >= self.count * T::entry_type().size().unwrap() as u32 {
             return Ok(None);
         }
 
@@ -632,7 +631,7 @@ impl<'a, T: EntryTypeRepr, R: Read + Seek + 'a> ReferencedValues<'a, T, R> {
             "when reading TIFF entry value"
         );
         self.next_offset += bytes_read;
-        self.current += 1;
+        self.bytes_read += bytes_read;
 
         Ok(Some(value))
     }
@@ -696,6 +695,16 @@ mod tests {
             let mut data = Vec::new();
             $($arg.write_to::<_, $e>(&mut data);)+
             data
+        }}
+    }
+
+    macro_rules! assert_items {
+        ($iter:expr $(, $item:expr)*) => {{
+            let mut it = $iter;
+            $(
+            assert_eq!(it.next().unwrap().unwrap(), $item);
+            )+
+            assert!(it.next().is_none());
         }}
     }
 
@@ -816,6 +825,10 @@ mod tests {
                             e.all_values::<entry_types::Byte>().unwrap().unwrap(), 
                             b"abcd".to_owned()
                         );
+                        assert_items!(
+                            e.values::<entry_types::Byte>().unwrap(),
+                            b'a', b'b', b'c', b'd'
+                        );
                     }
                     1 => {
                         assert_eq!(e.tag(), 8);
@@ -825,15 +838,104 @@ mod tests {
                             e.all_values::<entry_types::Ascii>().unwrap().unwrap(), 
                             vec!["hello", "world"]
                         );
+                        assert_items!(
+                            e.values::<entry_types::Ascii>().unwrap(),
+                            "hello".to_owned(), 
+                            "world".to_owned()
+                        );
                     }
                     2 => {
                         assert_eq!(e.tag(), 15);
                         assert_eq!(e.entry_type(), EntryType::Short);
                         assert_eq!(e.count(), 2);
-                        let mut it = e.values::<entry_types::Short>().unwrap();
-                        assert_eq!(it.next().unwrap().unwrap(), 23);
-                        assert_eq!(it.next().unwrap().unwrap(), 34);
-                        assert!(it.next().is_none());
+                        assert_eq!(
+                            e.all_values::<entry_types::Short>().unwrap().unwrap(),
+                            vec![23, 34]
+                        );
+                        assert_items!(
+                            e.values::<entry_types::Short>().unwrap(),
+                            23, 34
+                        );
+                    }
+                    3 => {
+                        assert_eq!(e.tag(), 16);
+                        assert_eq!(e.entry_type(), EntryType::Long);
+                        assert_eq!(e.count(), 3);
+                        assert_eq!(
+                            e.all_values::<entry_types::Long>().unwrap().unwrap(),
+                            vec![123, 12, 5492957]
+                        );
+                        assert_items!(
+                            e.values::<entry_types::Long>().unwrap(),
+                            123, 12, 5492957
+                        );
+                    }
+                    4 => {
+                        assert_eq!(e.tag(), 23);
+                        assert_eq!(e.entry_type(), EntryType::Rational);
+                        assert_eq!(e.count(), 2);
+                        assert_eq!(
+                            e.all_values::<entry_types::Rational>().unwrap().unwrap(),
+                            vec![(22, 7), (355, 113)]
+                        );
+                        assert_items!(
+                            e.values::<entry_types::Rational>().unwrap(),
+                            (22, 7), (355, 113)
+                        )
+                    }
+                    5 => {
+                        assert_eq!(e.tag(), 42);
+                        assert_eq!(e.entry_type(), EntryType::SignedByte);
+                        assert_eq!(e.count(), 8);
+                        assert_eq!(
+                            e.all_values::<entry_types::SignedByte>().unwrap().unwrap(),
+                            vec![-3, -2, -1, 0, 1, 2, 3, 4]
+                        );
+                        assert_items!(
+                            e.values::<entry_types::SignedByte>().unwrap(),
+                            -3, -2, -1, 0, 1, 2, 3, 4
+                        );
+                    }
+                    6 => {
+                        assert_eq!(e.tag(), 4);
+                        assert_eq!(e.entry_type(), EntryType::Undefined);
+                        assert_eq!(e.count(), 20);
+                        assert_eq!(
+                            e.all_values::<entry_types::Undefined>().unwrap().unwrap(),
+                            "привет мир!".to_owned().into_bytes()
+                        );
+                        assert_items!(
+                            e.values::<entry_types::Undefined>().unwrap(),
+                            // UTF-8 bytes
+                            208, 191, 209, 128, 208, 184, 208, 178, 208, 181, 209, 130, 32,
+                            208, 188, 208, 184, 209, 128, 33
+                        );
+                    }
+                    7 => {
+                        assert_eq!(e.tag(), 8);
+                        assert_eq!(e.entry_type(), EntryType::SignedShort);
+                        assert_eq!(e.count(), 3);
+                        assert_eq!(
+                            e.all_values::<entry_types::SignedShort>().unwrap().unwrap(),
+                            vec![-8, 0, 128]
+                        );
+                        assert_items!(
+                            e.values::<entry_types::SignedShort>().unwrap(),
+                            -8, 0, 128
+                        );
+                    }
+                    8 => {
+                        assert_eq!(e.tag(), 15);
+                        assert_eq!(e.entry_type(), EntryType::SignedLong);
+                        assert_eq!(e.count(), 1);
+                        assert_eq!(
+                            e.all_values::<entry_types::SignedLong>().unwrap().unwrap(),
+                            vec![-3724]
+                        );
+                        assert_items!(
+                            e.values::<entry_types::SignedLong>().unwrap(),
+                            -3724
+                        );
                     }
                     _ => {}
                 }
