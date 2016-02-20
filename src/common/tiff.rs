@@ -270,7 +270,7 @@ impl EntryType {
             EntryType::Undefined      => Some(1),
             EntryType::SignedShort    => Some(2),
             EntryType::SignedLong     => Some(4),
-            EntryType::SignedRational => Some(4),
+            EntryType::SignedRational => Some(8),
             EntryType::Float          => Some(4),
             EntryType::Double         => Some(8),
             EntryType::Unknown(_)     => None,
@@ -937,7 +937,53 @@ mod tests {
                             -3724
                         );
                     }
-                    _ => {}
+                    9 => {
+                        assert_eq!(e.tag(), 16);
+                        assert_eq!(e.entry_type(), EntryType::SignedRational);
+                        assert_eq!(e.count(), 1);
+                        assert_eq!(
+                            e.all_values::<entry_types::SignedRational>().unwrap().unwrap(),
+                            vec![(-333, -106)]
+                        );
+                        assert_items!(
+                            e.values::<entry_types::SignedRational>().unwrap(),
+                            (-333, -106)
+                        );
+                    }
+                    10 => {
+                        assert_eq!(e.tag(), 23);
+                        assert_eq!(e.entry_type(), EntryType::Float);
+                        assert_eq!(e.count(), 1);
+                        assert_eq!(
+                            e.all_values::<entry_types::Float>().unwrap().unwrap(),
+                            vec![0.123]
+                        );
+                        assert_items!(
+                            e.values::<entry_types::Float>().unwrap(),
+                            0.123
+                        );
+                    }
+                    11 => {
+                        assert_eq!(e.tag(), 42);
+                        assert_eq!(e.entry_type(), EntryType::Double);
+                        assert_eq!(e.count(), 1);
+                        assert_eq!(
+                            e.all_values::<entry_types::Double>().unwrap().unwrap(),
+                            vec![3.14]
+                        );
+                        assert_items!(
+                            e.values::<entry_types::Double>().unwrap(),
+                            3.14
+                        );
+                    }
+                    12 => {
+                        assert_eq!(e.tag(), 4);
+                        assert_eq!(e.entry_type(), EntryType::Unknown(123));
+                        assert_eq!(e.count(), 0);
+                    }
+                    _ => {
+                        panic!("Too many IFD entries");
+                    }
                 }
             }
         }
