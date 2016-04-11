@@ -1,8 +1,6 @@
-use std::io::{Read, Seek, SeekFrom, Result as IoResult};
+use std::io::{self, Read, Seek, SeekFrom};
 use std::cell::{RefCell, Cell};
 use std::marker::PhantomData;
-
-use byteorder;
 
 use types::Result;
 use utils::{ByteOrder, ByteOrderReadExt};
@@ -404,14 +402,14 @@ pub trait EntryTypeRepr {
     /// Attempts to read the represented value from the given stream with the given byte order.
     ///
     /// Returns the number of bytes read and the value itself.
-    fn read_from<R: Read>(source: &mut R, byte_order: ByteOrder) -> IoResult<(u32, Self::Repr)>;
+    fn read_from<R: Read>(source: &mut R, byte_order: ByteOrder) -> io::Result<(u32, Self::Repr)>;
 
     /// Attempts to read a number of the represented values from the given stream with the given
     /// byte order.
     ///
     /// `n` values will be are stored in `target`, or an error will be returned. `target` vector
     /// may be modified even if this method returns an error.
-    fn read_many_from<R: Read>(source: &mut R, byte_order: ByteOrder, n: u32, target: &mut Vec<Self::Repr>) -> IoResult<()>;
+    fn read_many_from<R: Read>(source: &mut R, byte_order: ByteOrder, n: u32, target: &mut Vec<Self::Repr>) -> io::Result<()>;
 
     /// Reads the `n`th represented value inside `source`.
     ///
@@ -422,7 +420,7 @@ pub trait EntryTypeRepr {
 
 /// Contains representation types for all of defined TIFF entry types.
 pub mod entry_types {
-    use std::io::{Read, Result as IoResult};
+    use std::io::{self, Read};
     use std::str;
 
     use byteorder;
@@ -450,12 +448,12 @@ pub mod entry_types {
                         EntryType::$tpe
                     }
 
-                    fn read_from<R: Read>($source: &mut R, $byte_order: ByteOrder) -> IoResult<(u32, $repr)> {
+                    fn read_from<R: Read>($source: &mut R, $byte_order: ByteOrder) -> io::Result<(u32, $repr)> {
                         $read
                     }
 
                     fn read_many_from<R: Read>(source: &mut R, byte_order: ByteOrder,
-                                               n: u32, target: &mut Vec<Self::Repr>) -> IoResult<()> {
+                                               n: u32, target: &mut Vec<Self::Repr>) -> io::Result<()> {
                         // This logic is necessary to handle variable-size items (Ascii strings)
                         // We read item by item, increasing the read bytes counter until we read
                         // all expected items (whose size can be calculated)
