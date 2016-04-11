@@ -60,16 +60,6 @@ impl From<io::Error> for Error {
     }
 }
 
-impl From<::byteorder::Error> for Error {
-    #[inline]
-    fn from(e: ::byteorder::Error) -> Error {
-        match e {
-            ::byteorder::Error::UnexpectedEOF => Error::UnexpectedEndOfFile(None),
-            ::byteorder::Error::Io(e) => Error::Io(e)
-        }
-    }
-}
-
 /// Library-specific result type.
 pub type Result<T> = result::Result<T, Error>;
 

@@ -1,4 +1,4 @@
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom, Result as IoResult};
 use std::cell::{RefCell, Cell};
 use std::marker::PhantomData;
 
@@ -404,14 +404,14 @@ pub trait EntryTypeRepr {
     /// Attempts to read the represented value from the given stream with the given byte order.
     ///
     /// Returns the number of bytes read and the value itself.
-    fn read_from<R: Read>(source: &mut R, byte_order: ByteOrder) -> byteorder::Result<(u32, Self::Repr)>;
+    fn read_from<R: Read>(source: &mut R, byte_order: ByteOrder) -> IoResult<(u32, Self::Repr)>;
 
     /// Attempts to read a number of the represented values from the given stream with the given
     /// byte order.
     ///
     /// `n` values will be are stored in `target`, or an error will be returned. `target` vector
     /// may be modified even if this method returns an error.
-    fn read_many_from<R: Read>(source: &mut R, byte_order: ByteOrder, n: u32, target: &mut Vec<Self::Repr>) -> byteorder::Result<()>;
+    fn read_many_from<R: Read>(source: &mut R, byte_order: ByteOrder, n: u32, target: &mut Vec<Self::Repr>) -> IoResult<()>;
 
     /// Reads the `n`th represented value inside `source`.
     ///
@@ -422,7 +422,7 @@ pub trait EntryTypeRepr {
 
 /// Contains representation types for all of defined TIFF entry types.
 pub mod entry_types {
-    use std::io::Read;
+    use std::io::{Read, Result as IoResult};
     use std::str;
 
     use byteorder;
@@ -450,12 +450,12 @@ pub mod entry_types {
                         EntryType::$tpe
                     }
 
-                    fn read_from<R: Read>($source: &mut R, $byte_order: ByteOrder) -> byteorder::Result<(u32, $repr)> {
+                    fn read_from<R: Read>($source: &mut R, $byte_order: ByteOrder) -> IoResult<(u32, $repr)> {
                         $read
                     }
 
                     fn read_many_from<R: Read>(source: &mut R, byte_order: ByteOrder,
-                                               n: u32, target: &mut Vec<Self::Repr>) -> byteorder::Result<()> {
+                                               n: u32, target: &mut Vec<Self::Repr>) -> IoResult<()> {
                         // This logic is necessary to handle variable-size items (Ascii strings)
                         // We read item by item, increasing the read bytes counter until we read
                         // all expected items (whose size can be calculated)
@@ -736,7 +736,7 @@ mod tests {
     fn test_one_ifd() {
         let data = build! { BigEndian,
             b"MM", 42u16, 8u32,  // 1st IFD starts from 8th offset
-            
+
             // first IFD
             13u16,
 
@@ -808,7 +808,7 @@ mod tests {
         };
 
         let reader = TiffReader::new(Cursor::new(data));
-        
+
         for ifd in &reader.ifds().unwrap() {
             let ifd = ifd.unwrap();
 
@@ -822,7 +822,7 @@ mod tests {
                         assert_eq!(e.entry_type(), EntryType::Byte);
                         assert_eq!(e.count(), 4);
                         assert_eq!(
-                            e.all_values::<entry_types::Byte>().unwrap().unwrap(), 
+                            e.all_values::<entry_types::Byte>().unwrap().unwrap(),
                             b"abcd".to_owned()
                         );
                         assert_items!(
@@ -835,12 +835,12 @@ mod tests {
                         assert_eq!(e.entry_type(), EntryType::Ascii);
                         assert_eq!(e.count(), 12);
                         assert_eq!(
-                            e.all_values::<entry_types::Ascii>().unwrap().unwrap(), 
+                            e.all_values::<entry_types::Ascii>().unwrap().unwrap(),
                             vec!["hello", "world"]
                         );
                         assert_items!(
                             e.values::<entry_types::Ascii>().unwrap(),
-                            "hello".to_owned(), 
+                            "hello".to_owned(),
                             "world".to_owned()
                         );
                     }

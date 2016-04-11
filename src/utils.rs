@@ -119,7 +119,7 @@ macro_rules! gen_read_byte_order_ext {
         pub trait $tr: Read {
             $(
             #[inline]
-            fn $name(&mut self, byte_order: ByteOrder) -> byteorder::Result<$tpe> {
+            fn $name(&mut self, byte_order: ByteOrder) -> io::Result<$tpe> {
                 match byte_order {
                     ByteOrder::Little => ReadBytesExt::$name::<LittleEndian>(self),
                     ByteOrder::Big => ReadBytesExt::$name::<BigEndian>(self),
