@@ -34,6 +34,10 @@ You can see an example on how to use it in `tests/test.rs`.
 
 ## Changelog
 
+### Version 0.3.2
+
+* Bumped byteorder dependency to 0.5.
+
 ### Version 0.3.1
 
 * Now WEBP parser does not panic on yet unsupported VP8 chunk types but returns an error instead
