@@ -29,7 +29,8 @@ impl<R: Read + Seek> TiffReader<R> {
     /// Note that the returned value does not implement `IntoIterator`, but an immutable
     /// reference to it does. Therefore, it should be used like this:
     ///
-    /// ```no_run
+    /// TODO: make it `no_run` instead after tiff module is made public again
+    /// ```ignore
     /// # use std::io::Cursor;
     /// # use immeta::common::tiff::TiffReader;
     /// # let r = TiffReader::new(Cursor::new(Vec::<u8>::new()));

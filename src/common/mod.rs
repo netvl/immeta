@@ -1,2 +1,2 @@
 pub mod riff;
-pub mod tiff;
+mod tiff;  // temporarily private to allow backwards-incompatible changes
