@@ -32,7 +32,7 @@
 //! like [image](https://crates.io/crates/image).
 
 extern crate byteorder;
-extern crate num;
+extern crate num_traits;
 extern crate arrayvec;
 
 pub use types::*;

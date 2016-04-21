@@ -4,7 +4,7 @@ use std::fmt;
 use std::borrow::Cow;
 use std::error;
 
-use num::ToPrimitive;
+use num_traits::ToPrimitive;
 
 /// Library-specific error type which is returned by metadata loading operations.
 #[derive(Debug)]
