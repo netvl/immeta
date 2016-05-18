@@ -34,6 +34,11 @@ You can see an example on how to use it in `tests/test.rs`.
 
 ## Changelog
 
+### Version 0.3.3
+
+* Switched to num_traits dependency from just num. num_traits is only used in a limited way,
+  so this doesn't seem to be a breaking change.
+
 ### Version 0.3.2
 
 * Bumped byteorder dependency to 0.5.
