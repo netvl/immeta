@@ -1,6 +1,7 @@
 //! Metadata of JPEG images.
 
 use std::io::BufRead;
+use std::fmt;
 
 use byteorder::{ReadBytesExt, BigEndian};
 
@@ -17,6 +18,16 @@ pub enum CodingProcess {
     DctProgressive,
     /// Lossless coding.
     Lossless
+}
+
+impl fmt::Display for CodingProcess {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(match *self {
+            CodingProcess::DctSequential => "Sequential DCT",
+            CodingProcess::DctProgressive => "Progressive DCT",
+            CodingProcess::Lossless => "Lossless",
+        })
+    }
 }
 
 impl CodingProcess {
@@ -37,6 +48,15 @@ pub enum EntropyCoding {
     Huffman,
     /// Arithmetic coding.
     Arithmetic
+}
+
+impl fmt::Display for EntropyCoding {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(match *self {
+            EntropyCoding::Huffman => "Huffman",
+            EntropyCoding::Arithmetic => "Arithmetic",
+        })
+    }
 }
 
 impl EntropyCoding {
@@ -91,7 +111,7 @@ impl LoadableMetadata for Metadata {
         try!(find_marker(r, "SOI", |m| m == 0xd8));
 
         // XXX: do we need to check for APP0 JFIF marker? This doesn't seem strictly necessary
-        // to me, and it seems that other interchange formats are also possible.
+        // XXX: to me, and it seems that other interchange formats are also possible.
 
         // read SOF marker, it must also be present in all JPEG files
         let marker = try!(find_marker(r, "SOF", is_sof_marker));
@@ -108,7 +128,7 @@ impl LoadableMetadata for Metadata {
         // read height and width
         let h = try_if_eof!(r.read_u16::<BigEndian>(), "when reading JPEG frame height");
         let w = try_if_eof!(r.read_u16::<BigEndian>(), "when reading JPEG frame width");
-        // TODO: handle h == 0 (we need to read until DNL marker after the first scan
+        // TODO: handle h == 0 (we need to read a DNL marker after the first scan)
 
         // there is only one baseline DCT marker, naturally
         let baseline = marker == 0xc0;

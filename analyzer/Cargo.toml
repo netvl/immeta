@@ -1,0 +1,8 @@
+[package]
+name = "immeta-analyzer"
+version = "0.1.0"
+authors = ["Vladimir Matveev <vladimir.matweev@gmail.com>"]
+
+[dependencies]
+immeta = { path = ".." }
+clap = "2.0"

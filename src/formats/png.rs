@@ -1,6 +1,7 @@
 //! Metadata for PNG images.
 
 use std::io::BufRead;
+use std::fmt;
 
 use byteorder::{ReadBytesExt, BigEndian};
 
@@ -17,6 +18,18 @@ pub enum ColorType {
     Indexed,
     GrayscaleAlpha,
     RgbAlpha
+}
+
+impl fmt::Display for ColorType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(match *self {
+            ColorType::Grayscale => "Grayscale",
+            ColorType::Rgb => "RGB",
+            ColorType::Indexed => "Indexed",
+            ColorType::GrayscaleAlpha => "Grayscale with alpha channel",
+            ColorType::RgbAlpha => "RGB with alpha channel",
+        })
+    }
 }
 
 const CT_GRAYSCALE: u8 = 0;
@@ -75,6 +88,14 @@ pub enum CompressionMethod {
     DeflateInflate
 }
 
+impl fmt::Display for CompressionMethod {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(match *self {
+            CompressionMethod::DeflateInflate => "Deflate/inflate",
+        })
+    }
+}
+
 impl CompressionMethod {
     fn from_u8(n: u8) -> Option<CompressionMethod> {
         match n {
@@ -95,6 +116,14 @@ pub enum FilterMethod {
     AdaptiveFiltering
 }
 
+impl fmt::Display for FilterMethod {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(match *self {
+            FilterMethod::AdaptiveFiltering => "Adaptive filtering",
+        })
+    }
+}
+
 impl FilterMethod {
     fn from_u8(n: u8) -> Option<FilterMethod> {
         match n {
@@ -111,6 +140,15 @@ impl FilterMethod {
 pub enum InterlaceMethod {
     Disabled,
     Adam7
+}
+
+impl fmt::Display for InterlaceMethod {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(match *self {
+            InterlaceMethod::Disabled => "Disabled",
+            InterlaceMethod::Adam7 => "Adam7",
+        })
+    }
 }
 
 impl InterlaceMethod {
