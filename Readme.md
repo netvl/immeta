@@ -8,7 +8,8 @@ immeta, an image metadata inspection library in Rust
 
 [Documentation](https://netvl.github.io/immeta/)
 
-immeta is an image metadata processing library. It allows you to inspect metadata, that is, image dimensions, color information, etc. of various image formats.
+immeta is an image metadata processing library. It allows you to inspect metadata, that is,
+image dimensions, color information, etc. of various image formats.
 
 Currently the following image formats are supported:
  * JPEG
@@ -18,11 +19,12 @@ Currently the following image formats are supported:
 
 Support for more will come in future versions.
 
-**Important note:** this library is not intended to load actual image contents, i.e. the pixel data. If you need this functionality, consider using other libraries like [image](https://crates.io/crates/image).
+**Important note:** this library is not intended to load actual image contents, i.e. the pixel
+data. If you need this functionality, consider using other libraries like [image](https://crates.io/crates/image).
 
 ## Usage
 
-Just add a dependency in your `Cargo.toml`:
+Just add a dependency to your `Cargo.toml`:
 
 ```toml
 [dependencies]
@@ -33,6 +35,10 @@ You can see an example on how to use it in `tests/test.rs`.
 
 
 ## Changelog
+
+### Version 0.3.4
+
+* Improved JPEG format parser, it now should be panic-free.
 
 ### Version 0.3.3
 
@@ -45,7 +51,7 @@ You can see an example on how to use it in `tests/test.rs`.
 
 ### Version 0.3.1
 
-* Now WEBP parser does not panic on yet unsupported VP8 chunk types but returns an error instead
+* Now WEBP parser does not panic on yet unsupported VP8 chunk types but returns an error instead.
 
 ### Version 0.3.0
 
@@ -65,7 +71,8 @@ You can see an example on how to use it in `tests/test.rs`.
 
 ### Version 0.2.1
 
-* Added `std::error::Error` implementation for `immeta::Error` to facilitate interoperation with other code.
+* Added `std::error::Error` implementation for `immeta::Error` to facilitate interoperation
+  with other code.
 
 ### Version 0.2.0
 
