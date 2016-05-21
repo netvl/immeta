@@ -732,11 +732,11 @@ mod tests {
     }
 
     #[test]
-    fn test_one_ifd() {
+    fn test_one_ifd_all_types() {
         let data = build! { BigEndian,
             b"MM", 42u16, 8u32,  // 1st IFD starts from 8th offset
 
-            // first IFD
+            // first IFD has 13 entries
             13u16,
 
             // first entry, Byte
@@ -988,8 +988,47 @@ mod tests {
         }
     }
 
-    // one IFD
-    // two IFDs
+    #[test]
+    fn test_two_ifds() {
+        let data = build! { LittleEndian,
+            b"II", 42u16, 8u32,  // 1st IFD starts from 8th offset
+            
+            // first IFD has 2 entries
+            2u16,
+
+            // first entry, Short
+            4u16, 3u16, 2u32, 23u16, 45u16,
+
+            // second entry, SignedRational
+            8u16, 10u16, 2u32, ???u32,
+
+            // offset of the next IFD
+            ???u32,
+
+            // @???, SignedRational x2, 16 bytes
+            -3i32, -2i32, -5i32, -3i32,
+
+            // second IFD has 3 entries
+            3u16,
+
+            // first entry, Ascii
+            5u16, 2u16, 4u32, b"abc\0",
+
+            // second entry, Float
+            6u16, 11u16, 1u32, 0.456f32,
+
+            // third entry, Long
+            7u16, 4u16, 3u32, ???u32,
+
+            // next IFD offset, zero means no more IFDs
+            0u32,
+
+            // @???, Long x3, 12 bytes
+            12u32, 34u32, 45u32
+        };
+
+    }
+
     // first - third - second IFDs
     // reading IFD entries
     //   all types
