@@ -1,6 +1,6 @@
 use std::io::{self, Read, BufRead, ErrorKind};
 
-use byteorder::{self, ReadBytesExt, LittleEndian, BigEndian};
+use byteorder::{ReadBytesExt, LittleEndian, BigEndian};
 use byteorder::ByteOrder as ByteOrderTrait;
 
 pub trait ReadExt: Read {

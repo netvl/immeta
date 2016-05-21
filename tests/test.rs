@@ -1,7 +1,7 @@
 extern crate immeta;
 
 use immeta::Dimensions;
-use immeta::formats::{png, gif};
+use immeta::formats::{png, gif, jpeg};
 use immeta::markers::{Png, Gif, Jpeg, Webp};
 
 const OWLET_DIM: Dimensions = Dimensions {
@@ -29,6 +29,11 @@ fn test_jpeg() {
     // let md = Jpeg::from(md).ok()
     let md = md.into::<Jpeg>().ok().expect("not JPEG metadata");
     assert_eq!(md.dimensions, OWLET_DIM);
+    assert_eq!(md.sample_precision, 8);
+    assert_eq!(md.coding_process, jpeg::CodingProcess::DctSequential);
+    assert_eq!(md.entropy_coding, jpeg::EntropyCoding::Huffman);
+    assert!(md.baseline);
+    assert!(!md.differential);
 }
 
 #[test]

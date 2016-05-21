@@ -35,7 +35,7 @@ use generic::markers::MetadataMarker;
 /// ```
 ///
 /// `MetadataMarker::Metadata` associated type always points to concrete metadata type
-/// from one of `immeta::formats` submodule.
+/// from one of `immeta::formats` submodules.
 pub mod markers {
     use std::io::{BufRead, Seek};
     use std::path::Path;
@@ -45,7 +45,7 @@ pub mod markers {
     use types::Result;
     use formats::{jpeg, png, gif, webp};
 
-    /// A marker trait for specific metadata type.
+    /// A marker trait for a specific metadata type.
     pub trait MetadataMarker {
         type Metadata;
 
@@ -283,30 +283,29 @@ impl GenericMetadata {
 pub fn load<R: ?Sized + BufRead + Seek>(r: &mut R) -> Result<GenericMetadata> {
     // try png
     try!(r.seek(SeekFrom::Start(0)));
-    if let Ok(md) = png::Metadata::load(r) {
+    if let Ok(md) = png::Metadata::load_from_seek(r) {
         return Ok(GenericMetadata::Png(md));
     }
 
     // try gif
     try!(r.seek(SeekFrom::Start(0)));
-    if let Ok(md) = gif::Metadata::load(r) {
+    if let Ok(md) = gif::Metadata::load_from_seek(r) {
         return Ok(GenericMetadata::Gif(md));
     }
 
     // try webp
     try!(r.seek(SeekFrom::Start(0)));
-    if let Ok(md) = webp::Metadata::load(r) {
+    if let Ok(md) = webp::Metadata::load_from_seek(r) {
         return Ok(GenericMetadata::Webp(md));
     }
 
     // try jpeg
-    // should be the last because JPEG can't be determined from its header (since it has none)
     try!(r.seek(SeekFrom::Start(0)));
-    if let Ok(md) = jpeg::Metadata::load(r) {
+    if let Ok(md) = jpeg::Metadata::load_from_seek(r) {
         return Ok(GenericMetadata::Jpeg(md));
     }
 
-    Err(invalid_format!("unknown or unsupported file type"))
+    Err(invalid_format!("unknown or unsupported image type"))
 }
 
 /// Attempts to load metadata for an image contained in a file identified by the provided path.

@@ -9,8 +9,7 @@
 //!
 //! Naturally, different image formats (JPEG, PNG, GIF, WebP, etc.) all have different
 //! types of metadata available within them. In fact, the only common piece of metadata
-//! between all of them is image resolution (and even that is not always easily extractable,
-//! as in JPEG case).
+//! between all of them is image resolution.
 //!
 //! immeta can inspect an image file and load the metadata specific to this format. Metadata 
 //! for each image format is exposed as a separate type; there is also a generic type

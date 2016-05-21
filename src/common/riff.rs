@@ -240,7 +240,7 @@ mod tests {
 
     #[test]
     fn test_invalid_header() {
-        let mut data = b"XXXX\x04abcd" as &[u8];
+        let mut data: &[u8] = b"XXXX\x04abcd";
 
         let mut r = RiffReader::new(&mut data);
 
