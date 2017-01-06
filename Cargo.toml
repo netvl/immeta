@@ -10,6 +10,6 @@ readme = "Readme.md"
 keywords = ["image", "metadata"]
 
 [dependencies]
-byteorder = "0.5"
+byteorder = "1.0"
 num-traits = "0.1.32"
 arrayvec = "0.3"
