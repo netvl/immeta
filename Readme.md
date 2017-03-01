@@ -36,6 +36,10 @@ You can see an example on how to use it in `tests/test.rs`.
 
 ## Changelog
 
+### Version 0.3.5
+
+* Updated byteorder dependency to 1.0.
+
 ### Version 0.3.4
 
 * Improved JPEG format parser, it now should be panic-free.
