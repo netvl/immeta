@@ -1,6 +1,6 @@
 [package]
 name = "immeta"
-version = "0.3.5"
+version = "0.3.6"
 authors = ["Vladimir Matveev <vladimir.matweev@gmail.com>"]
 description = "An image metadata parsing library"
 license = "MIT"
