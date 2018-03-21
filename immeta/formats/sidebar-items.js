@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["gif","Metadata of GIF images."],["jpeg","Metadata of JPEG images."],["png","Metadata for PNG images."],["webp",""]]});

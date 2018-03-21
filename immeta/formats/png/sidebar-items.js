@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["ColorType","Color type used in an image."],["CompressionMethod","Compression method used in an image."],["FilterMethod","Filtering method used in an image."],["InterlaceMethod","Interlace method used in an image."]],"struct":[["Metadata","Represents metadata of a PNG image."]]});

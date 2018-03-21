@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["CodingProcess","Coding process used in an image."],["EntropyCoding","Entropy coding method used in an image."]],"struct":[["Metadata","Represents metadata of a JPEG image."]]});
