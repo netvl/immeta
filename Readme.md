@@ -6,7 +6,7 @@ immeta, an image metadata inspection library in Rust
   [travis]: https://img.shields.io/travis/netvl/immeta.svg?style=flat-square
   [crates]: https://img.shields.io/crates/v/immeta.svg?style=flat-square
 
-[Documentation](https://netvl.github.io/immeta/)
+[Documentation](https://docs.rs/immeta/)
 
 immeta is an image metadata processing library. It allows you to inspect metadata, that is,
 image dimensions, color information, etc. of various image formats.
@@ -28,13 +28,17 @@ Just add a dependency to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-immeta = "0.3"
+immeta = "0.4"
 ```
 
 You can see an example on how to use it in `tests/test.rs`.
 
 
 ## Changelog
+
+### Version 0.4.0
+
+* Updated num-traits dependency to 0.2.
 
 ### Version 0.3.6
 
