@@ -105,16 +105,24 @@ fn find_marker<R: ?Sized, F>(r: &mut R, name: &str, mut matcher: F) -> Result<u8
     }
 }
 
+fn skip_extra_makers<R: ?Sized + BufRead>(r: &mut R) -> Result<u8> {
+    loop {
+        let marker = try!(find_marker(r, "Extra", |_| true));
+        if is_sof_marker(marker) {
+            // return last (SOF) marker
+            return Ok(marker);
+        }
+        let size = try_if_eof!(r.read_u16::<BigEndian>(), "when reading some marker payload size");
+        let _ = r.skip_exact(size as u64 - 2);
+    }
+}
+
 impl LoadableMetadata for Metadata {
     fn load<R: ?Sized + BufRead>(r: &mut R) -> Result<Metadata> {
         // read SOI marker, it must be present in all JPEG files
         try!(find_marker(r, "SOI", |m| m == 0xd8));
 
-        // XXX: do we need to check for APP0 JFIF marker? This doesn't seem strictly necessary
-        // XXX: to me, and it seems that other interchange formats are also possible.
-
-        // read SOF marker, it must also be present in all JPEG files
-        let marker = try!(find_marker(r, "SOF", is_sof_marker));
+        let marker = try!(skip_extra_makers(r));
 
         // read and check SOF marker length
         let size = try_if_eof!(r.read_u16::<BigEndian>(), "when reading SOF marker payload size");
