@@ -36,6 +36,10 @@ You can see an example on how to use it in `tests/test.rs`.
 
 ## Changelog
 
+### Version 0.4.1
+
+* Updated arrayvec dependency to 0.5.
+
 ### Version 0.4.0
 
 * Updated num-traits dependency to 0.2.
