@@ -1,6 +1,6 @@
 [package]
 name = "immeta"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["Vladimir Matveev <vladimir.matweev@gmail.com>"]
 description = "An image metadata parsing library"
 license = "MIT"
@@ -12,4 +12,4 @@ keywords = ["image", "metadata"]
 [dependencies]
 byteorder = "1.0"
 num-traits = "0.2"
-arrayvec = "0.4"
+arrayvec = "0.5"
